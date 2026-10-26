@@ -3,9 +3,16 @@ import Layout, { navItems } from './components/Layout.jsx';
 import { useAuth } from './context/AuthContext.jsx';
 import Login from './pages/Login.jsx';
 import Products from './pages/Products.jsx';
+import Purchases from './pages/Purchases.jsx';
+import Sales from './pages/Sales.jsx';
+import { Customers, Suppliers } from './pages/Parties.jsx';
 
 const pages = {
   '/products': <Products />,
+  '/purchases': <Purchases />,
+  '/sales': <Sales />,
+  '/customers': <Customers />,
+  '/suppliers': <Suppliers />,
 };
 
 function ComingSoon({ title }) {
