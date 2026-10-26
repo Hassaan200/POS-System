@@ -8,6 +8,9 @@ function SaleForm({ products, customers, onClose, onSaved }) {
   const key = useRef(newKey());
   const [date, setDate] = useState(today());
   const [customerId, setCustomerId] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newMobile, setNewMobile] = useState('');
+  const createdId = useRef(null);
   const [lines, setLines] = useState([{ ...emptyLine }]);
   const [discount, setDiscount] = useState('0');
   const [received, setReceived] = useState('');
@@ -25,9 +28,16 @@ function SaleForm({ products, customers, onClose, onSaved }) {
     setBusy(true);
     setError('');
     try {
+      if (customerId === 'new' && !createdId.current) {
+        const mobile = newMobile.trim();
+        const existing = mobile ? customers.find((c) => c.mobile === mobile) : null;
+        createdId.current = existing
+          ? existing.id
+          : (await api.post('/customers', { name: newName.trim(), mobile: mobile || null, opening_balance: 0 })).id;
+      }
       await api.post('/sales', {
         sale_date: date,
-        customer_id: customerId ? Number(customerId) : null,
+        customer_id: customerId === 'new' ? createdId.current : customerId ? Number(customerId) : null,
         lines: lines.map((l) => ({ product_id: Number(l.product_id), quantity: Number(l.quantity), rate: Number(l.rate) })),
         discount: Number(discount || 0),
         received_amount: Math.round(receivedNow * 100) / 100,
@@ -48,10 +58,21 @@ function SaleForm({ products, customers, onClose, onSaved }) {
           <Field label="Customer" hint={customerId ? '' : 'Walk-in sales must be paid in full'}>
             <select className={inputClass} value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
               <option value="">Walk-in customer</option>
+              <option value="new">+ New customer (add name and number)</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.name}{c.mobile ? ` (${c.mobile})` : ''}</option>)}
             </select>
           </Field>
         </div>
+        {customerId === 'new' && (
+          <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2">
+            <Field label="New customer name">
+              <input required className={inputClass} value={newName} onChange={(e) => { setNewName(e.target.value); createdId.current = null; }} />
+            </Field>
+            <Field label="Mobile number" hint="If this number already exists, that customer is used">
+              <input className={inputClass} inputMode="tel" value={newMobile} onChange={(e) => { setNewMobile(e.target.value); createdId.current = null; }} />
+            </Field>
+          </div>
+        )}
         <LinesEditor products={products} lines={lines} onChange={setLines} mode="sale" />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Discount (optional)">
