@@ -41,6 +41,3 @@ export function createApp() {
   app.use(errorHandler);
   return app;
 }
-// === YEH LINE FILE KE END MEIN ADD KREIN ===
-const app = createApp();
-export default app;
