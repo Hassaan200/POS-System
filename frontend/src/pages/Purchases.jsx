@@ -39,7 +39,6 @@ function PurchaseForm({ products, suppliers, onClose, onSaved }) {
   return (
     <Modal title="New Purchase" onClose={onClose} wide>
       <form onSubmit={submit} className="space-y-4">
-        <ErrorBox message={error} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Date"><input required type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
           <Field label="Supplier">
@@ -58,6 +57,7 @@ function PurchaseForm({ products, suppliers, onClose, onSaved }) {
           <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">Remaining payable<div className="text-lg font-semibold">{money(remaining)}</div></div>
         </div>
         <Field label="Note (optional)"><input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+        <ErrorBox message={error} />
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save purchase'}</Button>

@@ -17,7 +17,8 @@ function SaleForm({ products, customers, onClose, onSaved }) {
 
   const subtotal = linesTotal(lines);
   const total = subtotal - Number(discount || 0);
-  const remaining = total - Number(received || 0);
+  const receivedNow = received === '' ? total : Number(received);
+  const remaining = total - receivedNow;
 
   async function submit(e) {
     e.preventDefault();
@@ -29,7 +30,7 @@ function SaleForm({ products, customers, onClose, onSaved }) {
         customer_id: customerId ? Number(customerId) : null,
         lines: lines.map((l) => ({ product_id: Number(l.product_id), quantity: Number(l.quantity), rate: Number(l.rate) })),
         discount: Number(discount || 0),
-        received_amount: Number(received || 0),
+        received_amount: Math.round(receivedNow * 100) / 100,
         notes: notes || null,
       }, key.current);
       onSaved();
@@ -42,7 +43,6 @@ function SaleForm({ products, customers, onClose, onSaved }) {
   return (
     <Modal title="New Sale" onClose={onClose} wide>
       <form onSubmit={submit} className="space-y-4">
-        <ErrorBox message={error} />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Date"><input required type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
           <Field label="Customer" hint={customerId ? '' : 'Walk-in sales must be paid in full'}>
@@ -57,9 +57,10 @@ function SaleForm({ products, customers, onClose, onSaved }) {
           <Field label="Discount (optional)">
             <input type="number" min="0" step="0.01" inputMode="decimal" className={inputClass} value={discount} onChange={(e) => setDiscount(e.target.value)} />
           </Field>
-          <Field label="Amount received now">
+          <Field label="Amount received now" hint="Leave empty if the full amount is received">
             <input
-              required type="number" min="0" step="0.01" inputMode="decimal" className={inputClass}
+              type="number" min="0" step="0.01" inputMode="decimal" className={inputClass}
+              placeholder={String(Math.round(total * 100) / 100)}
               value={received} onChange={(e) => setReceived(e.target.value)}
             />
           </Field>
@@ -70,6 +71,7 @@ function SaleForm({ products, customers, onClose, onSaved }) {
           <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">Customer balance<div className="text-lg font-semibold">{money(remaining)}</div></div>
         </div>
         <Field label="Note (optional)"><input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
+        <ErrorBox message={error} />
         <div className="flex justify-end gap-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save sale'}</Button>

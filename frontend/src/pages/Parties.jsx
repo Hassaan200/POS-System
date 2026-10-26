@@ -3,7 +3,7 @@ import { api, newKey } from '../lib/api.js';
 import { money, qty, today } from '../lib/format.js';
 import { Button, ErrorBox, Field, Modal, PageHeader, inputClass } from '../components/ui.jsx';
 
-const config = {
+export const config = {
   customer: {
     base: '/customers', title: 'Customers', add: 'Add Customer', totalKey: 'total_charged', paidKey: 'total_received',
     totalLabel: 'Total charged', paidLabel: 'Received', balanceLabel: 'Receivable', payLabel: 'Receive payment',
@@ -66,7 +66,7 @@ function PartyForm({ cfg, party, onClose, onSaved }) {
   );
 }
 
-function PaymentForm({ cfg, party, onClose, onSaved }) {
+export function PaymentForm({ cfg, party, onClose, onSaved }) {
   const key = useRef(newKey());
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(today());
@@ -217,13 +217,20 @@ function PartyPage({ kind }) {
                 <td className="px-3 py-2">
                   <div className="font-medium">{p.name}{!p.is_active && <span className="ml-2 text-xs text-slate-400">(inactive)</span>}</div>
                   <div className="text-xs text-slate-500">{p.mobile || 'No mobile'}</div>
+                  <div className="mt-2 flex flex-wrap gap-2 md:hidden">
+                    <button className="rounded-lg border border-slate-300 px-3 py-1 text-xs" onClick={() => setDialog({ type: 'statement', party: p })}>Statement</button>
+                    {p.balance > 0 && (
+                      <button className="rounded-lg bg-slate-900 px-3 py-1 text-xs text-white" onClick={() => setDialog({ type: 'pay', party: p })}>{cfg.payLabel}</button>
+                    )}
+                    <button className="rounded-lg border border-slate-300 px-3 py-1 text-xs" onClick={() => setDialog({ type: 'form', party: p })}>Edit</button>
+                  </div>
                 </td>
                 <td className="hidden px-3 py-2 md:table-cell">{money(p[cfg.totalKey])}</td>
                 <td className="hidden px-3 py-2 md:table-cell">{money(p[cfg.paidKey])}</td>
                 <td className={`px-3 py-2 font-semibold ${p.balance > 0 ? 'text-amber-700' : ''}`}>{money(p.balance)}</td>
-                <td className="space-x-3 whitespace-nowrap px-3 py-2 text-right">
+                <td className="hidden space-x-3 whitespace-nowrap px-3 py-2 text-right md:table-cell">
                   <button className="underline" onClick={() => setDialog({ type: 'statement', party: p })}>Statement</button>
-                  {p.balance > 0 && <button className="underline" onClick={() => setDialog({ type: 'pay', party: p })}>Pay</button>}
+                  {p.balance > 0 && <button className="underline" onClick={() => setDialog({ type: 'pay', party: p })}>{cfg.payLabel}</button>}
                   <button className="underline" onClick={() => setDialog({ type: 'form', party: p })}>Edit</button>
                 </td>
               </tr>

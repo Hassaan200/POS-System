@@ -11,7 +11,7 @@ export default function LinesEditor({ products, lines, onChange, mode }) {
 
   const pick = (index, id) => {
     const product = products.find((p) => String(p.id) === id);
-    const rate = product ? (mode === 'sale' ? product.selling_rate : product.purchase_cost) : '';
+    const rate = product && mode !== 'sale' ? product.purchase_cost : '';
     update(index, { product_id: id, rate: String(rate) });
   };
 

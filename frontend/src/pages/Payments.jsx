@@ -1,7 +1,35 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import { money } from '../lib/format.js';
-import { ErrorBox, Field, PageHeader, inputClass } from '../components/ui.jsx';
+import { Button, ErrorBox, Field, Modal, PageHeader, inputClass } from '../components/ui.jsx';
+import { PaymentForm, config } from './Parties.jsx';
+
+function PartyPicker({ kind, onPick, onClose }) {
+  const [parties, setParties] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.get(config[kind].base)
+      .then((list) => setParties(list.filter((p) => p.balance > 0)))
+      .catch((err) => setError(err.message));
+  }, [kind]);
+
+  return (
+    <Modal title={config[kind].payLabel} onClose={onClose}>
+      <ErrorBox message={error} />
+      {!parties && !error && <div className="text-sm text-slate-500">Loading...</div>}
+      {parties && parties.length === 0 && <div className="text-sm text-slate-500">Nobody has an outstanding balance.</div>}
+      {parties && parties.length > 0 && (
+        <Field label={kind === 'customer' ? 'Customer' : 'Supplier'}>
+          <select className={inputClass} defaultValue="" onChange={(e) => onPick(parties.find((p) => String(p.id) === e.target.value))}>
+            <option value="">Select...</option>
+            {parties.map((p) => <option key={p.id} value={p.id}>{p.name} - {money(p.balance)}</option>)}
+          </select>
+        </Field>
+      )}
+    </Modal>
+  );
+}
 
 export default function Payments() {
   const [kind, setKind] = useState('customer');
@@ -10,6 +38,8 @@ export default function Payments() {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [picking, setPicking] = useState(false);
+  const [chosen, setChosen] = useState(null);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
@@ -55,6 +85,10 @@ export default function Payments() {
       <PageHeader title="Payments">{tab('customer', 'Received from customers')}{tab('supplier', 'Paid to suppliers')}</PageHeader>
       <ErrorBox message={error} />
 
+      <div className="my-4">
+        <Button onClick={() => setPicking(true)}>{isCustomer ? 'Receive payment from customer' : 'Pay a supplier'}</Button>
+      </div>
+
       <div className="my-4 grid grid-cols-2 gap-3 sm:w-96">
         <Field label="From"><input type="date" className={inputClass} value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
         <Field label="To"><input type="date" className={inputClass} value={to} onChange={(e) => setTo(e.target.value)} /></Field>
@@ -95,6 +129,13 @@ export default function Payments() {
           </tbody>
         </table>
       </div>
+
+      {picking && (
+        <PartyPicker kind={kind} onClose={() => setPicking(false)} onPick={(party) => { setPicking(false); setChosen(party); }} />
+      )}
+      {chosen && (
+        <PaymentForm cfg={config[kind]} party={chosen} onClose={() => setChosen(null)} onSaved={() => { setChosen(null); load(); }} />
+      )}
     </div>
   );
 }

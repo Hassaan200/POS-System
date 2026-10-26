@@ -5,18 +5,18 @@ import { Button, ErrorBox, Field, Modal, PageHeader, inputClass } from '../compo
 
 const emptyForm = {
   name: '', code: '', category_id: '', fabric_type_id: '',
-  opening_stock: '0', purchase_cost: '0', selling_rate: '0', is_active: true,
+  opening_stock: '0', purchase_cost: '0', is_active: true,
 };
 
 function ProductForm({ product, catalog, onClose, onSaved }) {
   const [form, setForm] = useState(
     product
       ? {
-          name: product.name, code: product.code, category_id: String(product.category_id),
-          fabric_type_id: product.fabric_type_id ? String(product.fabric_type_id) : '',
-          opening_stock: String(product.opening_stock), purchase_cost: String(product.purchase_cost),
-          selling_rate: String(product.selling_rate), is_active: Boolean(product.is_active),
-        }
+        name: product.name, code: product.code, category_id: String(product.category_id),
+        fabric_type_id: product.fabric_type_id ? String(product.fabric_type_id) : '',
+        opening_stock: String(product.opening_stock), purchase_cost: String(product.purchase_cost),
+        is_active: Boolean(product.is_active),
+      }
       : emptyForm
   );
   const [error, setError] = useState('');
@@ -41,7 +41,6 @@ function ProductForm({ product, catalog, onClose, onSaved }) {
       fabric_type_id: form.fabric_type_id ? Number(form.fabric_type_id) : null,
       opening_stock: Number(form.opening_stock),
       purchase_cost: Number(form.purchase_cost),
-      selling_rate: Number(form.selling_rate),
     };
     try {
       if (product) await api.put(`/products/${product.id}`, { ...payload, is_active: form.is_active });
@@ -93,9 +92,9 @@ function ProductForm({ product, catalog, onClose, onSaved }) {
           <Field label="Purchase cost per yard" hint="Used to value opening stock">
             <input type="number" min="0" step="0.01" inputMode="decimal" className={inputClass} value={form.purchase_cost} onChange={set('purchase_cost')} />
           </Field>
-          <Field label="Selling rate per yard">
+          {/* <Field label="Selling rate per yard">
             <input type="number" min="0" step="0.01" inputMode="decimal" className={inputClass} value={form.selling_rate} onChange={set('selling_rate')} />
-          </Field>
+          </Field> */}
           {product && (
             <label className="flex items-center gap-2 text-sm sm:mt-7">
               <input
@@ -267,7 +266,7 @@ export default function Products() {
               <th className="hidden px-3 py-2 md:table-cell">Sold</th>
               <th className="px-3 py-2">Current yards</th>
               <th className="hidden px-3 py-2 lg:table-cell">Avg cost</th>
-              <th className="px-3 py-2">Sell rate</th>
+              {/* <th className="px-3 py-2">Sell rate</th> */}
               <th className="px-3 py-2" />
             </tr>
           </thead>
@@ -288,7 +287,7 @@ export default function Products() {
                 <td className="hidden px-3 py-2 md:table-cell">{qty(p.sold_qty)}</td>
                 <td className={`px-3 py-2 font-semibold ${p.stock_qty < 0 ? 'text-red-600' : ''}`}>{qty(p.stock_qty)}</td>
                 <td className="hidden px-3 py-2 lg:table-cell">{money(p.avg_cost)}</td>
-                <td className="px-3 py-2">{money(p.selling_rate)}</td>
+                {/* <td className="px-3 py-2">{money(p.selling_rate)}</td> */}
                 <td className="px-3 py-2 text-right">
                   <button className="text-sm text-slate-700 underline" onClick={() => setEditing(p)}>Edit</button>
                 </td>
