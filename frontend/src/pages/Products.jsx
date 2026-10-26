@@ -86,7 +86,7 @@ function ProductForm({ product, catalog, onClose, onSaved }) {
             hint={openingLocked ? 'Locked because purchases or sales already exist' : 'Stock you already have today'}
           >
             <input
-              type="number" min="0" step="0.25" inputMode="decimal" className={inputClass}
+              type="number" min="0" step="any" inputMode="decimal" className={inputClass}
               value={form.opening_stock} onChange={set('opening_stock')} disabled={openingLocked}
             />
           </Field>

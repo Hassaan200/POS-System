@@ -6,8 +6,16 @@ import Products from './pages/Products.jsx';
 import Purchases from './pages/Purchases.jsx';
 import Sales from './pages/Sales.jsx';
 import { Customers, Suppliers } from './pages/Parties.jsx';
+import Dashboard from './pages/Dashboard.jsx';
+import Payments from './pages/Payments.jsx';
+import Reports from './pages/Reports.jsx';
+import Settings from './pages/Settings.jsx';
 
 const pages = {
+  '/': <Dashboard />,
+  '/payments': <Payments />,
+  '/reports': <Reports />,
+  '/settings': <Settings />,
   '/products': <Products />,
   '/purchases': <Purchases />,
   '/sales': <Sales />,

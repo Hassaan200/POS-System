@@ -32,7 +32,7 @@ export default function LinesEditor({ products, lines, onChange, mode }) {
                 )}
               </div>
               <input
-                required type="number" min="0.01" step="0.25" inputMode="decimal" placeholder="Yards"
+                required type="number" min="0.01" step="any" inputMode="decimal" placeholder="Yards"
                 className={inputClass} value={line.quantity} onChange={(e) => update(index, { quantity: e.target.value })}
               />
               <input
