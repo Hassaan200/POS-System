@@ -1,0 +1,46 @@
+name: Database backup
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install MySQL client
+        run: which mysqldump || (sudo apt-get update && sudo apt-get install -y mysql-client)
+
+      - name: Dump database
+        env:
+          MYSQL_PWD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          mysqldump \
+            --host="${{ secrets.DB_HOST }}" \
+            --port="${{ secrets.DB_PORT }}" \
+            --user="${{ secrets.DB_USER }}" \
+            --ssl-mode=REQUIRED \
+            --single-transaction --routines --no-tablespaces --set-gtid-purged=OFF \
+            "${{ secrets.DB_NAME }}" | gzip > dump.sql.gz
+
+      - name: Check the dump is real
+        run: |
+          test "$(stat -c %s dump.sql.gz)" -gt 3000
+          zcat dump.sql.gz | grep -q 'CREATE TABLE `sales`'
+          zcat dump.sql.gz | grep -q 'CREATE TABLE `stock_movements`'
+
+      - name: Encrypt
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          STAMP=$(date -u +%Y-%m-%d_%H-%M)
+          openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:BACKUP_PASSPHRASE -in dump.sql.gz -out "backup-$STAMP.sql.gz.enc"
+          rm dump.sql.gz
+
+      - name: Keep the encrypted backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup
+          path: backup-*.sql.gz.enc
+          retention-days: 30
