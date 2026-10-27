@@ -1,7 +1,146 @@
 @import "tailwindcss";
+@import "@fontsource-variable/hanken-grotesk";
+@import "@fontsource-variable/bodoni-moda/opsz.css";
+@import "@fontsource-variable/bodoni-moda/opsz-italic.css";
+@import "@fontsource-variable/noto-nastaliq-urdu";
 
-@layer base {
-  body {
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+@theme {
+  --font-sans: "Hanken Grotesk Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Bodoni Moda Variable", Didot, Georgia, serif;
+  --font-urdu: "Noto Nastaliq Urdu Variable", serif;
+
+  --radius-md: 2px;
+  --radius-lg: 2px;
+  --radius-xl: 3px;
+  --radius-2xl: 3px;
+
+  --color-slate-50: #f7f7f7;
+  --color-slate-100: #efefef;
+  --color-slate-200: #e2e2e2;
+  --color-slate-300: #cbcbcb;
+  --color-slate-400: #8c8c8c;
+  --color-slate-500: #6b6b6b;
+  --color-slate-600: #4d4d4d;
+  --color-slate-700: #2b2b2b;
+  --color-slate-800: #141414;
+  --color-slate-900: #000000;
+
+  --color-amber-700: #000000;
+  --color-emerald-50: #f4f4f4;
+  --color-emerald-200: #d0d0d0;
+  --color-emerald-700: #000000;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: #fff;
+  color: #000;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  line-height: 1.05;
+}
+
+h2 {
+  font-size: 1.5rem;
+  line-height: 1.15;
+}
+
+th {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-size: 0.8125rem;
+  color: #6b6b6b;
+  border-bottom: 1px solid #000;
+}
+
+td {
+  font-variant-numeric: tabular-nums;
+}
+
+tbody tr {
+  transition: background-color 0.12s;
+}
+
+tbody tr:hover {
+  background: #f7f7f7;
+}
+
+input[type="checkbox"] {
+  accent-color: #000;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #000;
+  outline-offset: 2px;
+}
+
+aside button:focus-visible,
+aside a:focus-visible,
+header button:focus-visible {
+  outline-color: #fff;
+}
+
+::selection {
+  background: #000;
+  color: #fff;
+}
+
+.tape {
+  height: 12px;
+  color: #000;
+  border-bottom: 1px solid currentColor;
+  background:
+    linear-gradient(to right, currentColor 1px, transparent 1px) 0 100% / 40px 12px repeat-x,
+    linear-gradient(to right, currentColor 1px, transparent 1px) 0 100% / 8px 6px repeat-x;
+}
+
+.tape-light {
+  color: #fff;
+}
+
+.weave {
+  background-color: #000;
+  background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.055) 0 1px, transparent 1px 7px);
+}
+
+.hatch {
+  background-color: #fff;
+  background-image: repeating-linear-gradient(135deg, #000 0 1px, transparent 1px 4px);
+  box-shadow: inset 0 0 0 1px #000;
+}
+
+.modal-panel {
+  animation: modal-in 0.18s ease-out;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

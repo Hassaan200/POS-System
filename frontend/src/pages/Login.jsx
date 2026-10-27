@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { Button, ErrorBox, Field, inputClass } from '../components/ui.jsx';
 
 export default function Login() {
   const { user, login } = useAuth();
@@ -25,47 +26,53 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
-        <div>
-          <h1 className="text-xl font-semibold">Fabric Shop</h1>
-          <p className="text-sm text-slate-500">Sign in to continue</p>
+    <div className="grid min-h-screen lg:grid-cols-[1.15fr_1fr]">
+      <section className="weave relative flex min-h-[250px] flex-col justify-between overflow-hidden p-8 text-white lg:p-14">
+        <div lang="ur" dir="rtl" className="font-urdu text-2xl text-white/80">درانی</div>
+        <div className="py-10">
+          <div className="font-display italic leading-[0.92]" style={{ fontSize: 'clamp(3.75rem, 10vw, 8.5rem)' }}>
+            Durrani
+          </div>
+          <div className="mt-4 text-lg text-white/70">Fabric Shop</div>
         </div>
+        <div aria-hidden="true" className="-mx-8 lg:-mx-14">
+          <div className="flex overflow-hidden text-[11px] tabular-nums text-white/50">
+            {Array.from({ length: 40 }, (_, i) => (
+              <span key={i} className="w-[40px] shrink-0 pl-1">{i}</span>
+            ))}
+          </div>
+          <div className="tape tape-light opacity-70" />
+        </div>
+      </section>
 
-        {error && <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>}
+      <section className="flex items-center justify-center px-6 py-14">
+        <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
+          <div>
+            <h2 style={{ fontSize: '2.5rem' }}>Sign in</h2>
+            <p className="mt-2 text-sm text-slate-500">Use the shop's shared login.</p>
+          </div>
 
-        <label className="block text-sm">
-          <span className="text-slate-700">Email</span>
-          <input
-            type="email"
-            required
-            autoComplete="username"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-900"
-          />
-        </label>
+          <ErrorBox message={error} />
 
-        <label className="block text-sm">
-          <span className="text-slate-700">Password</span>
-          <input
-            type="password"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-slate-900"
-          />
-        </label>
+          <Field label="Email">
+            <input
+              type="email" required autoComplete="username" className={inputClass}
+              value={email} onChange={(e) => setEmail(e.target.value)}
+            />
+          </Field>
 
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded-lg bg-slate-900 text-white py-2.5 text-sm font-medium disabled:opacity-60"
-        >
-          {busy ? 'Signing in...' : 'Sign in'}
-        </button>
-      </form>
+          <Field label="Password">
+            <input
+              type="password" required autoComplete="current-password" className={inputClass}
+              value={password} onChange={(e) => setPassword(e.target.value)}
+            />
+          </Field>
+
+          <Button type="submit" disabled={busy} className="w-full py-3">
+            {busy ? 'Signing in...' : 'Sign in'}
+          </Button>
+        </form>
+      </section>
     </div>
   );
 }

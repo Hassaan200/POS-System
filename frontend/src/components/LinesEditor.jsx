@@ -36,7 +36,7 @@ export default function LinesEditor({ products, lines, onChange, mode }) {
                 className={inputClass} value={line.quantity} onChange={(e) => update(index, { quantity: e.target.value })}
               />
               <input
-                required type="number" min="0" step="0.01" inputMode="decimal" placeholder="Rate / yard"
+                required type="number" min="0" step="0.01" inputMode="decimal" placeholder="Rate"
                 className={inputClass} value={line.rate} onChange={(e) => update(index, { rate: e.target.value })}
               />
               <div className="flex items-center justify-between gap-2 text-sm">
