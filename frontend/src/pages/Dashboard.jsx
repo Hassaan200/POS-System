@@ -86,9 +86,20 @@ export default function Dashboard() {
   if (!data) {
     return (
       <div>
-        <PageHeader title="Dashboard" />
-        {error ? <ErrorBox message={error} /> : <div className="text-slate-500">Loading...</div>}
-      </div>
+  <PageHeader title="Dashboard" />
+  {error ? (
+    <ErrorBox message={error} />
+  ) : (
+    /* Modern Smooth Loading Spinner */
+    <div className="flex flex-col items-center justify-center p-16 space-y-4 min-h-[300px]">
+      <div className="w-10 h-10 border-4 border-slate-200 border-t-gray-900 rounded-full animate-spin"></div>
+      <p className="text-sm font-medium text-slate-400 animate-pulse tracking-wide">
+        Fetching dashboard data...
+      </p>
+    </div>
+  )}
+</div>
+
     );
   }
 

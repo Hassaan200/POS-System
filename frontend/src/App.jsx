@@ -37,7 +37,20 @@ function ComingSoon({ title }) {
 function ProtectedLayout() {
   const { user, loading } = useAuth();
   const location = useLocation();
-  if (loading) return <div className="p-8 text-slate-500">Loading...</div>;
+  if (loading) {
+  return (
+    <div className="flex flex-col items-center justify-center p-12 space-y-4 min-h-[200px]">
+      {/* Smooth Spinning Circle */}
+      <div className="w-10 h-10 border-4 border-slate-200 border-t-gray-900 rounded-full animate-spin"></div>
+      
+      {/* Subtle modern text */}
+      <p className="text-sm font-medium text-slate-500 animate-pulse tracking-wide">
+        Loading data...
+      </p>
+    </div>
+  );
+}
+
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />;
   return <Layout />;
 }
