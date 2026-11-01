@@ -8,11 +8,13 @@ import Sales from './pages/Sales.jsx';
 import { Customers, Suppliers } from './pages/Parties.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Payments from './pages/Payments.jsx';
+import DailyBook from './pages/DailyBook.jsx';
 import Reports from './pages/Reports.jsx';
 import Settings from './pages/Settings.jsx';
 
 const pages = {
   '/': <Dashboard />,
+  '/daily-book': <DailyBook />,
   '/payments': <Payments />,
   '/reports': <Reports />,
   '/settings': <Settings />,

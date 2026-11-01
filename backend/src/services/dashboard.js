@@ -3,6 +3,7 @@ import { r2 } from '../utils/money.js';
 import { monthStartIn, todayIn } from '../utils/dates.js';
 import { getSettings } from './common.js';
 import { listCustomers, listSuppliers } from './ledger.js';
+import { expenseTotal } from './expenses.js';
 
 export async function getDashboard({ from, to } = {}) {
   const { timezone, currency } = await getSettings();
@@ -31,6 +32,8 @@ export async function getDashboard({ from, to } = {}) {
      WHERE s.status = 'active' AND s.sale_date BETWEEN ? AND ?`, [periodFrom, periodTo]
   );
 
+  const todayExpenses = await expenseTotal(pool, today, today);
+  const periodExpenses = await expenseTotal(pool, periodFrom, periodTo);
   const customers = await listCustomers();
   const suppliers = await listSuppliers();
 
@@ -40,6 +43,7 @@ export async function getDashboard({ from, to } = {}) {
     stock: { total_yards: stockTotal.yards, total_value: r2(stockTotal.value), by_category: byCategory },
     today_sales: { count: todaySales.count, total: r2(todaySales.total) },
     today_purchases: { count: todayPurchases.count, total: r2(todayPurchases.total) },
+    today_expenses: todayExpenses,
     receivable: r2(customers.reduce((sum, c) => sum + c.balance, 0)),
     payable: r2(suppliers.reduce((sum, s) => sum + s.balance, 0)),
     profit: {
@@ -48,6 +52,8 @@ export async function getDashboard({ from, to } = {}) {
       revenue: r2(profit.revenue),
       cogs: r2(profit.cogs),
       gross_profit: r2(profit.revenue - profit.cogs),
+      expenses: periodExpenses.total,
+      net_profit: r2(profit.revenue - profit.cogs - periodExpenses.total),
     },
   };
 }

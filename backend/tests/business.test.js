@@ -439,3 +439,62 @@ describe('exports', () => {
     assert.ok(buffer.length > 800);
   });
 });
+
+describe('expenses and daily book', () => {
+  let expenseId;
+
+  it('records an expense and lists it', async () => {
+    const res = await api.post('/expenses', {
+      expense_date: today(), category: 'food_tea', description: 'Chai and cold drinks', amount: 200,
+    });
+    assert.equal(res.status, 201);
+    expenseId = res.data.id;
+    near(res.data.amount, 200, 'expense amount');
+    const list = (await api.get(`/expenses?from=${today()}&to=${today()}`)).data;
+    assert.ok(list.some((e) => e.id === expenseId));
+  });
+
+  it('repeated expense submission is recorded only once', async () => {
+    const key = randomUUID();
+    const body = { expense_date: today(), category: 'advance', description: 'Advance to Ali', amount: 500 };
+    const first = await api.post('/expenses', body, { key });
+    const second = await api.post('/expenses', body, { key });
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 200);
+    assert.equal(first.data.id, second.data.id);
+  });
+
+  it('rejects zero amount, unknown category and empty description', async () => {
+    const base = { expense_date: today(), category: 'rent', description: 'Shop rent', amount: 1000 };
+    assert.equal((await api.post('/expenses', { ...base, amount: 0 })).status, 400);
+    assert.equal((await api.post('/expenses', { ...base, category: 'gambling' })).status, 400);
+    assert.equal((await api.post('/expenses', { ...base, description: '   ' })).status, 400);
+  });
+
+  it('daily book shows sales and expenses side by side with correct balance', async () => {
+    const book = (await api.get(`/expenses/daily-book?date=${today()}`)).data;
+    const sales = (await api.get(`/sales?from=${today()}&to=${today()}`)).data.filter((s) => s.status === 'active');
+    near(book.totals.sales, sales.reduce((s, x) => s + x.total_amount, 0), 'book sales');
+    near(book.totals.expenses, 700, 'book expenses');
+    near(book.totals.balance, book.totals.sales - 700, 'book balance');
+    assert.equal(book.expenses.length, 2);
+  });
+
+  it('voided expense stays in history but leaves the totals', async () => {
+    const res = await api.post(`/expenses/${expenseId}/void`, {});
+    assert.equal(res.status, 200);
+    const again = await api.post(`/expenses/${expenseId}/void`, {});
+    assert.equal(again.status, 409);
+    const book = (await api.get(`/expenses/daily-book?date=${today()}`)).data;
+    near(book.totals.expenses, 500, 'expenses after void');
+    assert.equal(book.expenses.length, 2);
+    assert.ok(book.expenses.some((e) => e.id === expenseId && e.status === 'void'));
+  });
+
+  it('dashboard net profit is gross profit minus expenses', async () => {
+    const dash = (await api.get('/dashboard')).data;
+    near(dash.today_expenses.total, 500, "today's expenses");
+    near(dash.profit.expenses, 500, 'period expenses');
+    near(dash.profit.net_profit, dash.profit.gross_profit - 500, 'net profit');
+  });
+});

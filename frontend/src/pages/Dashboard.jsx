@@ -38,7 +38,7 @@ function HeroFigure({ label, value, count, emptyText, unit, currency }) {
   return (
     <div>
       <div className="text-sm text-white/60">{label}</div>
-      <div className="mt-3 font-display leading-none" style={{ fontSize: 'clamp(2.6rem, 6vw, 4.6rem)' }}>
+      <div className="mt-3 font-display leading-none" style={{ fontSize: 'clamp(2.4rem, 4.2vw, 3.6rem)' }}>
         <span className="mr-2 font-sans text-base text-white/60">{currency}</span>
         <Money value={shown} />
       </div>
@@ -109,7 +109,7 @@ export default function Dashboard() {
 
       <section className="weave mb-12 p-6 text-white sm:p-10">
         <div className="font-display text-xl italic text-white/80">{dateLine}</div>
-        <div className="mt-8 grid gap-10 sm:grid-cols-2">
+        <div className="mt-8 grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
           <HeroFigure
             label="Sales today" value={data.today_sales.total} count={data.today_sales.count}
             unit="sale" emptyText="No sales recorded yet" currency={cur}
@@ -117,6 +117,10 @@ export default function Dashboard() {
           <HeroFigure
             label="Purchases today" value={data.today_purchases.total} count={data.today_purchases.count}
             unit="purchase" emptyText="No purchases recorded yet" currency={cur}
+          />
+          <HeroFigure
+            label="Expenses today" value={data.today_expenses.total} count={data.today_expenses.count}
+            unit="expense" emptyText="No expenses recorded yet" currency={cur}
           />
         </div>
         <div className="tape tape-light mt-10 opacity-60" aria-hidden="true" />
@@ -193,9 +197,15 @@ export default function Dashboard() {
           <LedgerRow label="Net sales"><span>{cur} {money(profit.revenue)}</span></LedgerRow>
           <LedgerRow label="Cost of fabric sold"><span>{cur} {money(profit.cogs)}</span></LedgerRow>
           <div className="border-b-[3px] border-double border-black">
-            <LedgerRow label="Gross profit" strong>
-              <Money value={profit.gross_profit} className={`font-display text-3xl ${profit.gross_profit < 0 ? 'text-red-700' : ''}`} />
+                      <LedgerRow label="Gross profit">
+            <span className={`font-medium ${profit.gross_profit < 0 ? 'text-red-700' : ''}`}>{cur} {money(profit.gross_profit)}</span>
+          </LedgerRow>
+          <LedgerRow label="Shop expenses"><span>{cur} {money(profit.expenses)}</span></LedgerRow>
+          <div className="border-b-[3px] border-double border-black">
+            <LedgerRow label="Net profit" strong>
+              <Money value={profit.net_profit} className={`font-display text-3xl ${profit.net_profit < 0 ? 'text-red-700' : ''}`} />
             </LedgerRow>
+          </div>
           </div>
         </dl>
       </section>
