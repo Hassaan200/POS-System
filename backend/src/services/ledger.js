@@ -14,7 +14,7 @@ const customerSelect = `
   FROM customers c`;
 
 const supplierSelect = `
-  SELECT s.id, s.name, s.mobile, s.opening_balance, s.is_active, s.created_at,
+  SELECT s.id, s.name, s.mobile, s.currency, s.opening_balance, s.is_active, s.created_at,
     (SELECT COUNT(*) FROM purchases p WHERE p.supplier_id = s.id AND p.status = 'active') AS purchases_count,
     (SELECT COALESCE(SUM(pl.quantity), 0) FROM purchase_lines pl JOIN purchases p ON p.id = pl.purchase_id
        WHERE p.supplier_id = s.id AND p.status = 'active') AS yards_purchased,
@@ -76,7 +76,7 @@ export async function customerStatement(db = pool, id, { from, to } = {}) {
   const customer = await getCustomer(db, id);
   const [sales] = await db.query(
     `SELECT s.id, s.ref, s.sale_date AS date, s.total_amount, s.discount, s.created_at,
-       GROUP_CONCAT(CONCAT(p.name, ' ', sl.quantity, 'yd @ ', sl.rate) ORDER BY sl.id SEPARATOR '; ') AS items
+       GROUP_CONCAT(CONCAT(p.name, ' ', sl.quantity, 'yd @ ', sl.rate, '/', sl.rate_unit) ORDER BY sl.id SEPARATOR '; ') AS items
      FROM sales s JOIN sale_lines sl ON sl.sale_id = s.id JOIN products p ON p.id = sl.product_id
      WHERE s.customer_id = ? AND s.status = 'active' GROUP BY s.id`,
     [id]
@@ -106,7 +106,7 @@ export async function supplierStatement(db = pool, id, { from, to } = {}) {
   const supplier = await getSupplier(db, id);
   const [purchases] = await db.query(
     `SELECT p.id, p.ref, p.purchase_date AS date, p.total_amount, p.created_at,
-       GROUP_CONCAT(CONCAT(pr.name, ' ', pl.quantity, 'yd @ ', pl.rate) ORDER BY pl.id SEPARATOR '; ') AS items
+       GROUP_CONCAT(CONCAT(pr.name, ' ', pl.quantity, 'yd @ ', pl.rate, '/', pl.rate_unit) ORDER BY pl.id SEPARATOR '; ') AS items
      FROM purchases p JOIN purchase_lines pl ON pl.purchase_id = p.id JOIN products pr ON pr.id = pl.product_id
      WHERE p.supplier_id = ? AND p.status = 'active' GROUP BY p.id`,
     [id]

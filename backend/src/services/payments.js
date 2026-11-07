@@ -1,7 +1,7 @@
 import { pool, withTransaction } from '../config/db.js';
 import { r2 } from '../utils/money.js';
 import { badRequest, conflict, notFound } from '../utils/errors.js';
-import { audit, findByKey, isDuplicateKeyError, lockParty } from './common.js';
+import { audit, findByKey, getSettings, isDuplicateKeyError, lockParty } from './common.js';
 import { getCustomer, getSupplier, purchaseDue, saleDue } from './ledger.js';
 
 const customerPaymentSql = `
@@ -13,7 +13,7 @@ const customerPaymentSql = `
 
 const supplierPaymentSql = `
   SELECT p.id, p.supplier_id, sp.name AS supplier_name, p.purchase_id, pu.ref AS purchase_ref, p.payment_date,
-    p.amount, p.notes, p.status, p.created_at
+    p.amount, p.exchange_rate, sp.currency, p.notes, p.status, p.created_at
   FROM supplier_payments p
   JOIN suppliers sp ON sp.id = p.supplier_id
   LEFT JOIN purchases pu ON pu.id = p.purchase_id`;
@@ -86,11 +86,8 @@ export async function createSupplierPayment(input, userId) {
 
   try {
     const id = await withTransaction(async (conn) => {
-      await lockParty(conn, 'suppliers', input.supplier_id, 'Supplier');
-      const supplier = await getSupplier(conn, input.supplier_id);
-      if (input.amount > supplier.balance) {
-        throw badRequest(`Payment is more than the outstanding payable (${supplier.balance})`);
-      }
+      const supplier = await lockParty(conn, 'suppliers', input.supplier_id, 'Supplier');
+      const exchangeRate = supplier.currency === 'PKR' ? 1 : input.exchange_rate ?? (await getSettings(conn)).cny_pkr_rate;
       if (input.purchase_id) {
         const [[purchase]] = await conn.query('SELECT supplier_id, status FROM purchases WHERE id = ? FOR UPDATE', [input.purchase_id]);
         if (!purchase || purchase.supplier_id !== input.supplier_id) throw badRequest('Purchase does not belong to this supplier');
@@ -99,10 +96,10 @@ export async function createSupplierPayment(input, userId) {
         if (input.amount > due) throw badRequest(`Payment is more than the remaining amount on this purchase (${due})`);
       }
       const [result] = await conn.query(
-        `INSERT INTO supplier_payments (supplier_id, purchase_id, payment_date, amount, notes, idempotency_key)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-        [input.supplier_id, input.purchase_id ?? null, input.payment_date, input.amount, input.notes ?? null,
-          input.idempotency_key ?? null]
+        `INSERT INTO supplier_payments (supplier_id, purchase_id, payment_date, amount, exchange_rate, notes, idempotency_key)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [input.supplier_id, input.purchase_id ?? null, input.payment_date, input.amount, exchangeRate || 1,
+          input.notes ?? null, input.idempotency_key ?? null]
       );
       await audit(conn, userId, 'create', 'supplier_payment', result.insertId, `supplier ${input.supplier_id} amount ${input.amount}`);
       return result.insertId;

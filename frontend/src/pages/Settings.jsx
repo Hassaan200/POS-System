@@ -35,6 +35,9 @@ function ShopSettings() {
       <Notice message={notice} />
       <Field label="Shop name"><input className={inputClass} value={form.shop_name} onChange={(e) => setForm({ ...form, shop_name: e.target.value })} /></Field>
       <Field label="Currency"><input className={inputClass} value={form.currency} onChange={(e) => setForm({ ...form, currency: e.target.value })} /></Field>
+      <Field label="Yuan rate (PKR for 1 ¥)" hint="Used as the default when you enter a purchase or pay the supplier. You can change it on each entry.">
+        <input type="number" min="0" step="0.0001" inputMode="decimal" className={inputClass} value={form.cny_pkr_rate ?? 0} onChange={(e) => setForm({ ...form, cny_pkr_rate: e.target.value })} />
+      </Field>
       <Field label="Timezone" hint="Decides what counts as 'today' on the dashboard">
         <input className={inputClass} value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} />
       </Field>

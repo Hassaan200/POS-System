@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { money } from '../lib/format.js';
+import { cur } from '../lib/format.js';
+import useRate from '../lib/useRate.js';
+import Amount from '../components/Amount.jsx';
 import { Button, ErrorBox, Field, Modal, PageHeader, inputClass } from '../components/ui.jsx';
 import { PaymentForm, config } from './Parties.jsx';
 
@@ -10,7 +12,7 @@ function PartyPicker({ kind, onPick, onClose }) {
 
   useEffect(() => {
     api.get(config[kind].base)
-      .then((list) => setParties(list.filter((p) => p.balance > 0)))
+      .then((list) => setParties(list.filter((p) => p.is_active && (p.balance > 0 || p.currency === 'CNY'))))
       .catch((err) => setError(err.message));
   }, [kind]);
 
@@ -18,12 +20,12 @@ function PartyPicker({ kind, onPick, onClose }) {
     <Modal title={config[kind].payLabel} onClose={onClose}>
       <ErrorBox message={error} />
       {!parties && !error && <div className="text-sm text-slate-500">Loading...</div>}
-      {parties && parties.length === 0 && <div className="text-sm text-slate-500">Nobody has an outstanding balance.</div>}
+      {parties && parties.length === 0 && <div className="text-sm text-slate-500">No party available.</div>}
       {parties && parties.length > 0 && (
         <Field label={kind === 'customer' ? 'Customer' : 'Supplier'}>
           <select className={inputClass} defaultValue="" onChange={(e) => onPick(parties.find((p) => String(p.id) === e.target.value))}>
             <option value="">Select...</option>
-            {parties.map((p) => <option key={p.id} value={p.id}>{p.name} - {money(p.balance)}</option>)}
+            {parties.map((p) => <option key={p.id} value={p.id}>{p.name} - {cur(p.balance, p.currency || 'PKR')}</option>)}
           </select>
         </Field>
       )}
@@ -40,6 +42,7 @@ export default function Payments() {
   const [error, setError] = useState('');
   const [picking, setPicking] = useState(false);
   const [chosen, setChosen] = useState(null);
+  const rate = useRate();
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
@@ -59,7 +62,7 @@ export default function Payments() {
   useEffect(() => { load(); }, [load]);
 
   async function voidPayment(row) {
-    if (!window.confirm(`Void this payment of ${money(row.amount)}? The balance will go back up.`)) return;
+    if (!window.confirm(`Void this payment of ${cur(row.amount, row.currency || 'PKR')}? The balance will go back up.`)) return;
     try {
       await api.post(`/payments/${kind}/${row.id}/void`);
       load();
@@ -68,9 +71,10 @@ export default function Payments() {
     }
   }
 
+  const isCustomer = kind === 'customer';
   const active = rows.filter((r) => r.status === 'active');
   const total = active.reduce((sum, r) => sum + r.amount, 0);
-  const isCustomer = kind === 'customer';
+  const totalCode = !isCustomer && active.length && active.every((r) => r.currency === 'CNY') ? 'CNY' : 'PKR';
   const tab = (value, label) => (
     <button
       onClick={() => setKind(value)}
@@ -96,7 +100,7 @@ export default function Payments() {
 
       <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 sm:w-64">
         <div className="text-xs text-slate-500">Total {isCustomer ? 'received' : 'paid'} (active)</div>
-        <div className="text-xl font-semibold">{money(total)}</div>
+        <div className="text-xl font-semibold"><Amount value={total} currency={totalCode} rate={rate} /></div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
@@ -120,7 +124,7 @@ export default function Payments() {
                 <td className="px-3 py-2">{(isCustomer ? r.customer_name : r.supplier_name) || 'Walk-in'}</td>
                 <td className="hidden px-3 py-2 md:table-cell">{(isCustomer ? r.sale_ref : r.purchase_ref) || '-'}</td>
                 <td className="hidden px-3 py-2 md:table-cell">{r.notes || ''}</td>
-                <td className="px-3 py-2 text-right font-medium">{money(r.amount)}</td>
+                <td className="px-3 py-2 text-right font-medium"><Amount value={r.amount} currency={r.currency || 'PKR'} rate={Number(r.exchange_rate) > 1 ? Number(r.exchange_rate) : rate} /></td>
                 <td className="px-3 py-2 text-right">
                   {r.status === 'active' ? <button className="text-red-600 underline" onClick={() => voidPayment(r)}>Void</button> : 'Voided'}
                 </td>

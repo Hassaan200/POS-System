@@ -2,10 +2,13 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/db.js';
 import {
-  asyncHandler, dateSchema, idSchema, idempotencySchema, moneySchema, optionalText, positiveMoneySchema, qtySchema, validate,
+  asyncHandler, dateSchema, idSchema, idempotencySchema, moneySchema, optionalText, positiveMoneySchema, qtySchema,
+  rateSchema, unitSchema, validate,
 } from '../utils/http.js';
 import { badRequest } from '../utils/errors.js';
-import { cancelPurchase, createPurchase, getPurchase, listPurchases } from '../services/purchases.js';
+import {
+  addPurchaseCost, cancelPurchase, createPurchase, getPurchase, listPurchases, voidPurchaseCost,
+} from '../services/purchases.js';
 import { cancelSale, createSale, getSale, listSales } from '../services/sales.js';
 import {
   createCustomerPayment, createSupplierPayment, listCustomerPayments, listSupplierPayments, voidPayment,
@@ -27,14 +30,33 @@ const listQuery = z.object({
   search: z.string().max(60).optional(),
 });
 
-const lineSchema = z.object({ product_id: idSchema, quantity: qtySchema, rate: moneySchema });
+const lineSchema = z.object({ product_id: idSchema, quantity: qtySchema, rate: rateSchema, rate_unit: unitSchema });
+
+const purchaseLineSchema = z
+  .object({
+    product_id: idSchema,
+    quantity: qtySchema.optional(),
+    pieces: z.array(qtySchema).min(1).max(200).optional(),
+    rate: rateSchema,
+    rate_unit: unitSchema,
+  })
+  .refine((l) => l.quantity !== undefined || l.pieces !== undefined, 'Enter the yards or the length of each thaan');
 
 const purchaseSchema = z.object({
   purchase_date: dateSchema,
   supplier_id: idSchema,
-  lines: z.array(lineSchema).min(1, 'Add at least one fabric line').max(50),
+  lines: z.array(purchaseLineSchema).min(1, 'Add at least one fabric line').max(50),
+  exchange_rate: rateSchema.optional(),
   paid_amount: moneySchema.default(0),
   notes: optionalText(),
+  idempotency_key: idempotencySchema,
+});
+
+const purchaseCostSchema = z.object({
+  cost_date: dateSchema,
+  kind: z.enum(['shipping', 'customs', 'other']),
+  description: optionalText(),
+  amount: positiveMoneySchema,
   idempotency_key: idempotencySchema,
 });
 
@@ -62,6 +84,7 @@ const supplierPaymentSchema = z.object({
   purchase_id: idSchema.nullable().optional(),
   payment_date: dateSchema,
   amount: positiveMoneySchema,
+  exchange_rate: rateSchema.optional(),
   notes: optionalText(),
   idempotency_key: idempotencySchema,
 });
@@ -75,6 +98,13 @@ purchasesRouter.post('/', withKey, validate(purchaseSchema), asyncHandler(async 
 }));
 purchasesRouter.post('/:id/cancel', asyncHandler(async (req, res) => {
   res.json(await cancelPurchase(idSchema.parse(req.params.id), req.user.id));
+}));
+
+purchasesRouter.post('/:id/costs', withKey, validate(purchaseCostSchema), asyncHandler(async (req, res) => {
+  res.status(201).json(await addPurchaseCost(idSchema.parse(req.params.id), req.body, req.user.id));
+}));
+purchasesRouter.post('/costs/:costId/void', asyncHandler(async (req, res) => {
+  res.json(await voidPurchaseCost(idSchema.parse(req.params.costId), req.user.id));
 }));
 
 export const salesRouter = Router();

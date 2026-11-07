@@ -23,6 +23,14 @@ export const moneySchema = z.coerce
   .max(1000000000)
   .refine(hasMax2Decimals, 'Amount can have at most 2 decimals');
 
+  export const rateSchema = z.coerce
+  .number({ invalid_type_error: 'Rate must be a number' })
+  .min(0, 'Rate cannot be negative')
+  .max(1000000)
+  .refine((v) => Math.abs(v * 10000 - Math.round(v * 10000)) < 1e-6, 'Rate can have at most 4 decimals');
+
+export const unitSchema = z.enum(['yard', 'meter']).default('yard');
+
 export const positiveMoneySchema = moneySchema.refine((v) => v > 0, 'Amount must be greater than 0');
 
 export const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD').refine((s) => {

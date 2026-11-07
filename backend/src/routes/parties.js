@@ -11,6 +11,7 @@ const partySchema = z.object({
   name: z.string().trim().min(1).max(150),
   mobile: z.string().trim().max(30).optional().nullable().transform((v) => v || null),
   opening_balance: moneySchema.default(0),
+  currency: z.enum(['CNY', 'PKR']).default('CNY'),
 });
 const partyUpdateSchema = partySchema.partial().extend({ is_active: z.boolean().optional() });
 const statementQuery = z.object({ from: dateSchema.optional(), to: dateSchema.optional() });
@@ -32,10 +33,10 @@ function buildRouter({ table, list, get, statement }) {
   }));
 
   router.post('/', validate(partySchema), asyncHandler(async (req, res) => {
-    const { name, mobile, opening_balance: opening } = req.body;
-    const [result] = await pool.query(
-      `INSERT INTO ${table} (name, mobile, opening_balance) VALUES (?, ?, ?)`, [name, mobile, opening]
-    );
+    const { name, mobile, opening_balance: opening, currency } = req.body;
+    const [result] = table === 'suppliers'
+      ? await pool.query('INSERT INTO suppliers (name, mobile, opening_balance, currency) VALUES (?, ?, ?, ?)', [name, mobile, opening, currency])
+      : await pool.query(`INSERT INTO ${table} (name, mobile, opening_balance) VALUES (?, ?, ?)`, [name, mobile, opening]);
     await audit(pool, req.user.id, 'create', table, result.insertId, name);
     res.status(201).json(await get(pool, result.insertId));
   }));

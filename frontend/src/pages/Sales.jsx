@@ -38,7 +38,7 @@ function SaleForm({ products, customers, onClose, onSaved }) {
       await api.post('/sales', {
         sale_date: date,
         customer_id: customerId === 'new' ? createdId.current : customerId ? Number(customerId) : null,
-        lines: lines.map((l) => ({ product_id: Number(l.product_id), quantity: Number(l.quantity), rate: Number(l.rate) })),
+        lines: lines.filter((l) => !(l.fromSet && !Number(l.quantity))).map((l) => ({ product_id: Number(l.product_id), quantity: Number(l.quantity), rate: Number(l.rate), rate_unit: l.unit || 'yard' })),
         discount: Number(discount || 0),
         received_amount: Math.round(receivedNow * 100) / 100,
         notes: notes || null,

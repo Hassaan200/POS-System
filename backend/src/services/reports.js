@@ -20,6 +20,11 @@ function sumTotals(rows, keys) {
   return totals;
 }
 
+const uniformCurrency = (rows) => {
+  const codes = [...new Set(rows.map((r) => r.currency))];
+  return codes.length === 1 ? codes[0] : codes.length === 0 ? undefined : 'mixed currencies';
+};
+
 const periodLabel = ({ from, to }) => (from || to ? ` (${from || 'start'} to ${to || 'today'})` : '');
 
 async function stock() {
@@ -111,7 +116,8 @@ async function salesByProduct(params) {
 async function purchaseHistory(params) {
   const { where, params: p } = range('p.purchase_date', params);
   const [rows] = await pool.query(
-    `SELECT p.purchase_date AS date, p.ref, s.name AS supplier, pr.name AS fabric, pl.quantity, pl.rate, pl.line_total AS amount
+    `SELECT p.purchase_date AS date, p.ref, s.name AS supplier, pr.name AS fabric, pl.quantity, pl.rate, pl.rate_unit AS unit,
+       pl.line_total AS amount, p.currency
      FROM purchase_lines pl JOIN purchases p ON p.id = pl.purchase_id JOIN suppliers s ON s.id = p.supplier_id
      JOIN products pr ON pr.id = pl.product_id
      WHERE p.status = 'active' ${where.length ? `AND ${where.join(' AND ')}` : ''}
@@ -121,8 +127,10 @@ async function purchaseHistory(params) {
   return {
     title: `Purchase History${periodLabel(params)}`,
     columns: [col('date', 'Date', 'date'), col('ref', 'Ref'), col('supplier', 'Supplier'), col('fabric', 'Fabric'),
-      col('quantity', 'Yards', 'qty'), col('rate', 'Rate', 'money'), col('amount', 'Amount', 'money')],
+      col('quantity', 'Yards', 'qty'), col('rate', 'Rate', 'money'), col('unit', 'Per'), col('currency', 'Currency'),
+      col('amount', 'Amount', 'money')],
     rows,
+    currency: uniformCurrency(rows),
     totals: sumTotals(rows, ['quantity', 'amount']),
   };
 }
@@ -177,12 +185,13 @@ async function receivables() {
 
 async function payables() {
   const rows = (await listSuppliers()).filter((s) => s.balance !== 0).map((s) => ({
-    name: s.name, mobile: s.mobile || '-', purchases: s.total_purchases, paid: s.total_paid,
+    name: s.name, mobile: s.mobile || '-', currency: s.currency, purchases: s.total_purchases, paid: s.total_paid,
     opening: s.opening_balance, balance: s.balance,
   }));
   return {
     title: 'Supplier Balances Payable',
-    columns: [col('name', 'Supplier'), col('mobile', 'Mobile'), col('opening', 'Opening', 'money'),
+    currency: uniformCurrency(rows),
+    columns: [col('name', 'Supplier'), col('mobile', 'Mobile'), col('currency', 'Currency'), col('opening', 'Opening', 'money'),
       col('purchases', 'Total Purchases', 'money'), col('paid', 'Paid', 'money'), col('balance', 'Outstanding', 'money')],
     rows,
     totals: sumTotals(rows, ['opening', 'purchases', 'paid', 'balance']),
@@ -192,14 +201,14 @@ async function payables() {
 async function paymentHistory(params) {
   const c = range('p.payment_date', params);
   const [received] = await pool.query(
-    `SELECT p.payment_date AS date, 'Received' AS direction, COALESCE(cu.name, 'Walk-in') AS party,
+    `SELECT p.payment_date AS date, 'Received' AS direction, 'PKR' AS currency, COALESCE(cu.name, 'Walk-in') AS party,
        COALESCE(s.ref, '') AS reference, p.amount, p.notes, p.status, p.id
      FROM customer_payments p LEFT JOIN customers cu ON cu.id = p.customer_id LEFT JOIN sales s ON s.id = p.sale_id
      ${c.where.length ? `WHERE ${c.where.join(' AND ')}` : ''}`,
     c.params
   );
   const [paid] = await pool.query(
-    `SELECT p.payment_date AS date, 'Paid' AS direction, su.name AS party, COALESCE(pu.ref, '') AS reference,
+    `SELECT p.payment_date AS date, 'Paid' AS direction, su.currency AS currency, su.name AS party, COALESCE(pu.ref, '') AS reference,
        p.amount, p.notes, p.status, p.id
      FROM supplier_payments p JOIN suppliers su ON su.id = p.supplier_id LEFT JOIN purchases pu ON pu.id = p.purchase_id
      ${c.where.length ? `WHERE ${c.where.join(' AND ')}` : ''}`,
@@ -212,7 +221,7 @@ async function paymentHistory(params) {
   return {
     title: `Payment History${periodLabel(params)}`,
     columns: [col('date', 'Date', 'date'), col('direction', 'Type'), col('party', 'Party'), col('reference', 'Reference'),
-      col('amount', 'Amount', 'money'), col('status', 'Status'), col('notes', 'Notes')],
+      col('currency', 'Currency'), col('amount', 'Amount', 'money'), col('status', 'Status'), col('notes', 'Notes')],
     rows,
     totals: {
       received: r2(active.filter((r) => r.direction === 'Received').reduce((s, r) => s + r.amount, 0)),
@@ -242,6 +251,7 @@ async function supplierStatementReport({ supplier_id, from, to }) {
   const st = await supplierStatement(pool, supplier_id, { from, to });
   return {
     title: `Supplier Statement - ${st.supplier.name}${periodLabel({ from, to })}`,
+    currency: st.supplier.currency,
     columns: statementColumns.map((c) => (c.key === 'debit' ? col('debit', 'Purchased', 'money') : c)),
     rows: st.rows,
     totals: { debit: r2(st.rows.reduce((s, r) => s + r.debit, 0)), credit: r2(st.rows.reduce((s, r) => s + r.credit, 0)),

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, newKey } from '../lib/api.js';
-import { money, qty, today } from '../lib/format.js';
+import { cur, today } from '../lib/format.js';
+import useRate from '../lib/useRate.js';
+import Amount from '../components/Amount.jsx';
 import { Button, ErrorBox, Field, Modal, PageHeader, inputClass } from '../components/ui.jsx';
 
 export const config = {
@@ -21,6 +23,7 @@ function PartyForm({ cfg, party, onClose, onSaved }) {
     name: party?.name || '',
     mobile: party?.mobile || '',
     opening_balance: String(party?.opening_balance ?? 0),
+    currency: party?.currency || 'CNY',
     is_active: party ? Boolean(party.is_active) : true,
   });
   const [error, setError] = useState('');
@@ -32,6 +35,7 @@ function PartyForm({ cfg, party, onClose, onSaved }) {
     setBusy(true);
     setError('');
     const payload = { name: form.name, mobile: form.mobile || null, opening_balance: Number(form.opening_balance) };
+    if (cfg.idField === 'supplier_id' && !party) payload.currency = form.currency;
     try {
       if (party) await api.put(`${cfg.base}/${party.id}`, { ...payload, is_active: form.is_active });
       else await api.post(cfg.base, payload);
@@ -48,6 +52,14 @@ function PartyForm({ cfg, party, onClose, onSaved }) {
         <ErrorBox message={error} />
         <Field label="Name"><input required className={inputClass} value={form.name} onChange={set('name')} /></Field>
         <Field label="Mobile number"><input className={inputClass} value={form.mobile} onChange={set('mobile')} /></Field>
+        {cfg.idField === 'supplier_id' && (
+          <Field label="Supplier currency" hint={party ? 'Cannot be changed after creation' : 'China suppliers: Yuan'}>
+            <select disabled={Boolean(party)} className={inputClass} value={form.currency} onChange={set('currency')}>
+              <option value="CNY">Yuan (¥)</option>
+              <option value="PKR">Rupees (PKR)</option>
+            </select>
+          </Field>
+        )}
         <Field label="Opening balance" hint="Amount already pending before you started using this system">
           <input type="number" min="0" step="0.01" inputMode="decimal" className={inputClass} value={form.opening_balance} onChange={set('opening_balance')} />
         </Field>
@@ -71,15 +83,22 @@ export function PaymentForm({ cfg, party, onClose, onSaved }) {
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(today());
   const [notes, setNotes] = useState('');
+  const defaultRate = useRate();
+  const [rateInput, setRateInput] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const code = party.currency || 'PKR';
+  const isCny = code === 'CNY';
+  const rate = Number(rateInput || defaultRate || 0);
 
   async function submit(e) {
     e.preventDefault();
     setBusy(true);
     setError('');
     try {
-      await api.post(cfg.payPath, { [cfg.idField]: party.id, payment_date: date, amount: Number(amount), notes: notes || null }, key.current);
+      const body = { [cfg.idField]: party.id, payment_date: date, amount: Number(amount), notes: notes || null };
+      if (isCny) body.exchange_rate = rate;
+      await api.post(cfg.payPath, body, key.current);
       onSaved();
     } catch (err) {
       setError(err.message);
@@ -92,11 +111,16 @@ export function PaymentForm({ cfg, party, onClose, onSaved }) {
       <form onSubmit={submit} className="space-y-3">
         <ErrorBox message={error} />
         <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
-          Outstanding: <span className="font-semibold">{money(party.balance)}</span>
+          {party.balance < 0 ? 'Advance paid:' : 'Outstanding:'} <span className="font-semibold"><Amount value={Math.abs(party.balance)} currency={code} rate={defaultRate} /></span>
         </div>
-        <Field label="Amount">
+        <Field label={`Amount${isCny ? ' (¥)' : ''}`} hint={cfg.idField === 'supplier_id' ? 'You may pay more than the balance; it is kept as advance.' : undefined}>
           <input required autoFocus type="number" min="0.01" step="0.01" inputMode="decimal" className={inputClass} value={amount} onChange={(e) => setAmount(e.target.value)} />
         </Field>
+        {isCny && (
+          <Field label="Rate today (PKR for 1 ¥)" hint={amount && rate ? `≈ ${cur(Number(amount) * rate, 'PKR')}` : undefined}>
+            <input type="number" min="0" step="0.0001" inputMode="decimal" className={inputClass} placeholder={String(defaultRate || '')} value={rateInput} onChange={(e) => setRateInput(e.target.value)} />
+          </Field>
+        )}
         <Field label="Date"><input required type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
         <Field label="Note (optional)"><input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
         <div className="flex justify-end gap-2 pt-2">
@@ -109,6 +133,8 @@ export function PaymentForm({ cfg, party, onClose, onSaved }) {
 }
 
 function Statement({ cfg, party, onClose }) {
+  const code = party.currency || 'PKR';
+  const fmt = (v) => cur(v, code);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
@@ -133,21 +159,21 @@ function Statement({ cfg, party, onClose }) {
             <tbody>
               <tr className="border-t border-slate-100 text-slate-500">
                 <td className="px-2 py-2" colSpan="5">Opening balance</td>
-                <td className="px-2 py-2 text-right">{money(data.opening_balance)}</td>
+                <td className="px-2 py-2 text-right">{fmt(data.opening_balance)}</td>
               </tr>
               {data.rows.map((r) => (
                 <tr key={`${r.kind}-${r.id}`} className="border-t border-slate-100 align-top">
                   <td className="whitespace-nowrap px-2 py-2">{r.date}</td>
                   <td className="px-2 py-2">{r.reference}</td>
                   <td className="px-2 py-2">{r.description}</td>
-                  <td className="px-2 py-2 text-right">{r.debit ? money(r.debit) : ''}</td>
-                  <td className="px-2 py-2 text-right">{r.credit ? money(r.credit) : ''}</td>
-                  <td className="px-2 py-2 text-right font-medium">{money(r.balance)}</td>
+                  <td className="px-2 py-2 text-right">{r.debit ? fmt(r.debit) : ''}</td>
+                  <td className="px-2 py-2 text-right">{r.credit ? fmt(r.credit) : ''}</td>
+                  <td className="px-2 py-2 text-right font-medium">{fmt(r.balance)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <div className="mt-3 text-right text-sm font-semibold">Outstanding: {money(data.customer?.balance ?? data.supplier?.balance)}</div>
+          <div className="mt-3 text-right text-sm font-semibold">Outstanding: {fmt(data.customer?.balance ?? data.supplier?.balance)}</div>
         </div>
       )}
     </Modal>
@@ -161,6 +187,7 @@ function PartyPage({ kind }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dialog, setDialog] = useState(null);
+  const rate = useRate();
 
   const load = useCallback(async () => {
     try {
@@ -181,6 +208,8 @@ function PartyPage({ kind }) {
   }, [parties, search]);
 
   const outstanding = visible.reduce((sum, p) => sum + p.balance, 0);
+  const cnyOutstanding = visible.filter((p) => p.currency === 'CNY').reduce((sum, p) => sum + p.balance, 0);
+  const pkrOutstanding = outstanding - cnyOutstanding;
   const done = () => { setDialog(null); load(); };
 
   return (
@@ -194,7 +223,10 @@ function PartyPage({ kind }) {
         <input className={`${inputClass} sm:col-span-2`} placeholder="Search by name or mobile" value={search} onChange={(e) => setSearch(e.target.value)} />
         <div className="rounded-xl border border-slate-200 bg-white px-4 py-2">
           <div className="text-xs text-slate-500">Total {cfg.balanceLabel.toLowerCase()}</div>
-          <div className="font-semibold">{money(outstanding)}</div>
+          <div className="font-semibold">
+            {cnyOutstanding !== 0 && <Amount value={cnyOutstanding} currency="CNY" rate={rate} />}
+            {(cnyOutstanding === 0 || pkrOutstanding !== 0) && <div>{cur(pkrOutstanding, 'PKR')}</div>}
+          </div>
         </div>
       </div>
 
@@ -219,18 +251,18 @@ function PartyPage({ kind }) {
                   <div className="text-xs text-slate-500">{p.mobile || 'No mobile'}</div>
                   <div className="mt-2 flex flex-wrap gap-2 md:hidden">
                     <button className="rounded-lg border border-slate-300 px-3 py-1 text-xs" onClick={() => setDialog({ type: 'statement', party: p })}>Statement</button>
-                    {p.balance > 0 && (
+                    {(p.balance > 0 || p.currency === 'CNY') && (
                       <button className="rounded-lg bg-slate-900 px-3 py-1 text-xs text-white" onClick={() => setDialog({ type: 'pay', party: p })}>{cfg.payLabel}</button>
                     )}
                     <button className="rounded-lg border border-slate-300 px-3 py-1 text-xs" onClick={() => setDialog({ type: 'form', party: p })}>Edit</button>
                   </div>
                 </td>
-                <td className="hidden px-3 py-2 md:table-cell">{money(p[cfg.totalKey])}</td>
-                <td className="hidden px-3 py-2 md:table-cell">{money(p[cfg.paidKey])}</td>
-                <td className={`px-3 py-2 font-semibold ${p.balance > 0 ? 'text-amber-700' : ''}`}>{money(p.balance)}</td>
+                <td className="hidden px-3 py-2 md:table-cell"><Amount value={p[cfg.totalKey]} currency={p.currency} rate={rate} /></td>
+                <td className="hidden px-3 py-2 md:table-cell"><Amount value={p[cfg.paidKey]} currency={p.currency} rate={rate} /></td>
+                <td className={`px-3 py-2 font-semibold ${p.balance > 0 ? 'text-amber-700' : ''}`}><Amount value={p.balance} currency={p.currency} rate={rate} />{p.balance < 0 && <span className="block text-[11px] font-normal text-slate-500">advance</span>}</td>
                 <td className="hidden space-x-3 whitespace-nowrap px-3 py-2 text-right md:table-cell">
                   <button className="underline" onClick={() => setDialog({ type: 'statement', party: p })}>Statement</button>
-                  {p.balance > 0 && <button className="underline" onClick={() => setDialog({ type: 'pay', party: p })}>{cfg.payLabel}</button>}
+                  {(p.balance > 0 || p.currency === 'CNY') && <button className="underline" onClick={() => setDialog({ type: 'pay', party: p })}>{cfg.payLabel}</button>}
                   <button className="underline" onClick={() => setDialog({ type: 'form', party: p })}>Edit</button>
                 </td>
               </tr>

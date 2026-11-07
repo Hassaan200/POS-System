@@ -86,20 +86,19 @@ export default function Dashboard() {
   if (!data) {
     return (
       <div>
-  <PageHeader title="Dashboard" />
-  {error ? (
-    <ErrorBox message={error} />
-  ) : (
-    /* Modern Smooth Loading Spinner */
-    <div className="flex flex-col items-center justify-center p-16 space-y-4 min-h-[300px]">
-      <div className="w-10 h-10 border-4 border-slate-200 border-t-gray-900 rounded-full animate-spin"></div>
-      <p className="text-sm font-medium text-slate-400 animate-pulse tracking-wide">
-        Fetching dashboard data...
-      </p>
-    </div>
-  )}
-</div>
-
+        <PageHeader title="Dashboard" />
+        {error ? (
+          <ErrorBox message={error} />
+        ) : (
+          /* Humara VIP Minimalist Black Spinner */
+          <div className="flex flex-col items-center justify-center p-16 space-y-4 min-h-[300px]">
+            <div className="w-10 h-10 border-4 border-slate-200 border-t-black rounded-full animate-spin"></div>
+            <p className="text-sm font-medium text-slate-400 animate-pulse tracking-wide">
+              Fetching dashboard data...
+            </p>
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -120,7 +119,7 @@ export default function Dashboard() {
 
       <section className="weave mb-12 p-6 text-white sm:p-10">
         <div className="font-display text-xl italic text-white/80">{dateLine}</div>
-        <div className="mt-8 grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 grid gap-10 lg:grid-cols-3">
           <HeroFigure
             label="Sales today" value={data.today_sales.total} count={data.today_sales.count}
             unit="sale" emptyText="No sales recorded yet" currency={cur}
@@ -147,7 +146,10 @@ export default function Dashboard() {
             </LedgerRow>
             <LedgerRow label="You owe suppliers">
               <span className="hatch mr-2 inline-block h-2.5 w-2.5 align-middle" aria-hidden="true" />
-              <span className="font-medium">{cur} {money(data.payable)}</span>
+              <span className="font-medium">
+                {data.payable_cny !== 0 && <>¥ {money(data.payable_cny)}{data.cny_pkr_rate > 0 && <span className="ml-2 text-xs text-slate-500">≈ {cur} {money(data.payable)}</span>}</>}
+                {data.payable_cny === 0 && <>{cur} {money(data.payable)}</>}
+              </span>
             </LedgerRow>
           </dl>
           <div className="mt-4 flex h-3 overflow-hidden border border-black bg-white" aria-hidden="true">
@@ -207,8 +209,7 @@ export default function Dashboard() {
         <dl className="mt-4 max-w-xl">
           <LedgerRow label="Net sales"><span>{cur} {money(profit.revenue)}</span></LedgerRow>
           <LedgerRow label="Cost of fabric sold"><span>{cur} {money(profit.cogs)}</span></LedgerRow>
-          <div className="border-b-[3px] border-double border-black">
-                      <LedgerRow label="Gross profit">
+          <LedgerRow label="Gross profit">
             <span className={`font-medium ${profit.gross_profit < 0 ? 'text-red-700' : ''}`}>{cur} {money(profit.gross_profit)}</span>
           </LedgerRow>
           <LedgerRow label="Shop expenses"><span>{cur} {money(profit.expenses)}</span></LedgerRow>
@@ -216,7 +217,6 @@ export default function Dashboard() {
             <LedgerRow label="Net profit" strong>
               <Money value={profit.net_profit} className={`font-display text-3xl ${profit.net_profit < 0 ? 'text-red-700' : ''}`} />
             </LedgerRow>
-          </div>
           </div>
         </dl>
       </section>

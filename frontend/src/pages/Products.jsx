@@ -12,11 +12,11 @@ function ProductForm({ product, catalog, onClose, onSaved }) {
   const [form, setForm] = useState(
     product
       ? {
-        name: product.name, code: product.code, category_id: String(product.category_id),
-        fabric_type_id: product.fabric_type_id ? String(product.fabric_type_id) : '',
-        opening_stock: String(product.opening_stock), purchase_cost: String(product.purchase_cost),
-        is_active: Boolean(product.is_active),
-      }
+          name: product.name, code: product.code, category_id: String(product.category_id),
+          fabric_type_id: product.fabric_type_id ? String(product.fabric_type_id) : '',
+          opening_stock: String(product.opening_stock), purchase_cost: String(product.purchase_cost),
+          is_active: Boolean(product.is_active),
+        }
       : emptyForm
   );
   const [error, setError] = useState('');
@@ -92,9 +92,6 @@ function ProductForm({ product, catalog, onClose, onSaved }) {
           <Field label="Purchase cost per yard" hint="Used to value opening stock">
             <input type="number" min="0" step="0.01" inputMode="decimal" className={inputClass} value={form.purchase_cost} onChange={set('purchase_cost')} />
           </Field>
-          {/* <Field label="Selling rate per yard">
-            <input type="number" min="0" step="0.01" inputMode="decimal" className={inputClass} value={form.selling_rate} onChange={set('selling_rate')} />
-          </Field> */}
           {product && (
             <label className="flex items-center gap-2 text-sm sm:mt-7">
               <input
@@ -108,6 +105,58 @@ function ProductForm({ product, catalog, onClose, onSaved }) {
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save'}</Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function SetForm({ catalog, onClose, onSaved }) {
+  const [form, setForm] = useState({ set_name: '', code: '', category_id: '', fabric_type_id: '' });
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const types = catalog.find((c) => String(c.id) === form.category_id)?.types || [];
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await api.post('/products/set', {
+        set_name: form.set_name, code: form.code, category_id: Number(form.category_id),
+        fabric_type_id: form.fabric_type_id ? Number(form.fabric_type_id) : null,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal title="New Set (Front + Back + Dupatta)" onClose={onClose}>
+      <form onSubmit={submit} className="space-y-3">
+        <ErrorBox message={error} />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="Set name" hint="e.g. D-1"><input required className={inputClass} value={form.set_name} onChange={set('set_name')} /></Field>
+          <Field label="Code" hint="Parts become CODE-F, CODE-B, CODE-D"><input required className={inputClass} value={form.code} onChange={set('code')} /></Field>
+          <Field label="Category">
+            <select required className={inputClass} value={form.category_id} onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value, fabric_type_id: '' }))}>
+              <option value="">Select category</option>
+              {catalog.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Fabric type">
+            <select className={inputClass} value={form.fabric_type_id} onChange={set('fabric_type_id')} disabled={!types.length}>
+              <option value="">{types.length ? 'No specific type' : 'No types'}</option>
+              {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Create 3 parts'}</Button>
         </div>
       </form>
     </Modal>
@@ -194,6 +243,7 @@ export default function Products() {
   const [error, setError] = useState('');
   const [editing, setEditing] = useState(null);
   const [managing, setManaging] = useState(false);
+  const [addingSet, setAddingSet] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -227,6 +277,7 @@ export default function Products() {
     <div>
       <PageHeader title="Products & Stock">
         <Button variant="secondary" onClick={() => setManaging(true)}>Categories & Types</Button>
+        <Button variant="secondary" onClick={() => setAddingSet(true)}>New Set</Button>
         <Button onClick={() => setEditing('new')}>Add Fabric</Button>
       </PageHeader>
 
@@ -266,7 +317,6 @@ export default function Products() {
               <th className="hidden px-3 py-2 md:table-cell">Sold</th>
               <th className="px-3 py-2">Current yards</th>
               <th className="hidden px-3 py-2 lg:table-cell">Avg cost</th>
-              {/* <th className="px-3 py-2">Sell rate</th> */}
               <th className="px-3 py-2" />
             </tr>
           </thead>
@@ -287,7 +337,6 @@ export default function Products() {
                 <td className="hidden px-3 py-2 md:table-cell">{qty(p.sold_qty)}</td>
                 <td className={`px-3 py-2 font-semibold ${p.stock_qty < 0 ? 'text-red-600' : ''}`}>{qty(p.stock_qty)}</td>
                 <td className="hidden px-3 py-2 lg:table-cell">{money(p.avg_cost)}</td>
-                {/* <td className="px-3 py-2">{money(p.selling_rate)}</td> */}
                 <td className="px-3 py-2 text-right">
                   <button className="text-sm text-slate-700 underline" onClick={() => setEditing(p)}>Edit</button>
                 </td>
@@ -305,6 +354,7 @@ export default function Products() {
           onSaved={() => { setEditing(null); load(); }}
         />
       )}
+      {addingSet && <SetForm catalog={catalog} onClose={() => setAddingSet(false)} onSaved={() => { setAddingSet(false); load(); }} />}
       {managing && (
         <CatalogManager catalog={catalog} onClose={() => setManaging(false)} onChanged={setCatalog} />
       )}

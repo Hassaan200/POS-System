@@ -61,7 +61,7 @@ describe('master data', () => {
   });
 
   it('creates suppliers, customers and products with opening values', async () => {
-    const supplier = await api.post('/suppliers', { name: 'Ali Traders', mobile: '03001234567', opening_balance: 0 });
+    const supplier = await api.post('/suppliers', { name: 'Ali Traders', mobile: '03001234567', opening_balance: 0, currency: 'PKR' });
     const customer = await api.post('/customers', { name: 'Bilal Boutique', mobile: '03111234567', opening_balance: 0 });
     assert.equal(supplier.status, 201);
     assert.equal(customer.status, 201);
@@ -296,8 +296,6 @@ describe('payments', () => {
     const supplier = (await api.get(`/suppliers/${ids.supplier}`)).data;
     near(supplier.total_paid, 1460, 'supplier paid after payment');
     near(supplier.balance, supplier.total_purchases - 1460, 'supplier balance');
-    const over = await api.post('/payments/supplier', { supplier_id: ids.supplier, payment_date: today(), amount: 999999 });
-    assert.equal(over.status, 400);
   });
 
   it('customer statement running balance matches the stored balance', async () => {
@@ -496,5 +494,161 @@ describe('expenses and daily book', () => {
     near(dash.today_expenses.total, 500, "today's expenses");
     near(dash.profit.expenses, 500, 'period expenses');
     near(dash.profit.net_profit, dash.profit.gross_profit - 500, 'net profit');
+  });
+});
+
+describe('three-piece sets, thaan lengths and meter rates', () => {
+  let parts;
+  let purchase;
+
+  it('creates a Front / Back / Dupatta set as three stock items', async () => {
+    const res = await api.post('/products/set', { set_name: 'D-1', code: 'D1', category_id: ids.china });
+    assert.equal(res.status, 201);
+    assert.deepEqual(res.data.map((p) => p.part), ['front', 'back', 'dupatta']);
+    assert.deepEqual(res.data.map((p) => p.code), ['D1-F', 'D1-B', 'D1-D']);
+    parts = Object.fromEntries(res.data.map((p) => [p.part, p.id]));
+    const again = await api.post('/products/set', { set_name: 'D-1', code: 'D1', category_id: ids.china });
+    assert.equal(again.status, 409);
+  });
+
+  it('records each thaan length and prices the line per meter', async () => {
+    const res = await api.post('/purchases', {
+      purchase_date: today(),
+      supplier_id: ids.supplier,
+      lines: [
+        { product_id: parts.front, pieces: Array(8).fill(16), rate: 28, rate_unit: 'meter' },
+        { product_id: parts.back, pieces: [23.8, 16, 16, 16, 16, 16, 16, 16], rate: 6.5, rate_unit: 'meter' },
+        { product_id: parts.dupatta, pieces: Array(8).fill(48), rate: 6.5, rate_unit: 'meter' },
+      ],
+      paid_amount: 0,
+    });
+    assert.equal(res.status, 201);
+    purchase = res.data;
+    const [front, back, dupatta] = purchase.lines;
+    near(front.quantity, 128, 'front yards');
+    near(front.line_total, 3277.21, 'front amount');
+    assert.deepEqual(front.pieces, Array(8).fill(16));
+    near(back.quantity, 135.8, 'back yards');
+    near(back.line_total, 807.14, 'back amount');
+    assert.equal(back.pieces[0], 23.8);
+    near(dupatta.line_total, 2282.34, 'dupatta amount');
+    near(purchase.total_amount, 6366.69, 'purchase total');
+  });
+
+  it('adds the yards to stock for each part separately', async () => {
+    const front = (await api.get(`/products/${parts.front}`)).data;
+    const dupatta = (await api.get(`/products/${parts.dupatta}`)).data;
+    near(front.stock_qty, 128, 'front stock');
+    near(front.stock_value, 3277.21, 'front stock value');
+    near(dupatta.stock_qty, 384, 'dupatta stock');
+  });
+
+  it('rejects a yards total that disagrees with the thaan lengths', async () => {
+    const res = await api.post('/purchases', {
+      purchase_date: today(),
+      supplier_id: ids.supplier,
+      lines: [{ product_id: parts.front, quantity: 100, pieces: [16, 16], rate: 1 }],
+      paid_amount: 0,
+    });
+    assert.equal(res.status, 400);
+  });
+
+  it('sells by meter rate and reverses a cancelled set purchase cleanly', async () => {
+    const sale = await api.post('/sales', {
+      sale_date: today(),
+      customer_id: ids.customer,
+      lines: [{ product_id: parts.front, quantity: 10, rate: 100, rate_unit: 'meter' }],
+      received_amount: 0,
+    });
+    assert.equal(sale.status, 201);
+    near(sale.data.total_amount, 914.4, 'sale total');
+    assert.equal((await api.post(`/sales/${sale.data.id}/cancel`, {})).status, 200);
+    assert.equal((await api.post(`/purchases/${purchase.id}/cancel`, {})).status, 200);
+    const front = (await api.get(`/products/${parts.front}`)).data;
+    near(front.stock_qty, 0, 'front stock after cancel');
+    near(front.stock_value, 0, 'front value after cancel');
+    const integrity = await api.get('/settings/integrity');
+    assert.equal(integrity.data.ok, true, JSON.stringify(integrity.data.problems));
+  });
+});
+
+describe('yuan supplier, advance payment and landed cost', () => {
+  let chinaSupplier;
+  let front;
+  let purchase;
+
+  it('creates a Chinese supplier in yuan and refuses a purchase without an exchange rate', async () => {
+    const supplier = await api.post('/suppliers', { name: 'Guangzhou Textile' });
+    assert.equal(supplier.data.currency, 'CNY');
+    chinaSupplier = supplier.data.id;
+    const set = await api.post('/products/set', { set_name: 'D-2', code: 'D2', category_id: ids.china });
+    front = set.data[0].id;
+    const res = await api.post('/purchases', {
+      purchase_date: today(), supplier_id: chinaSupplier, paid_amount: 0,
+      lines: [{ product_id: front, pieces: Array(8).fill(16), rate: 28, rate_unit: 'meter' }],
+    });
+    assert.equal(res.status, 400);
+  });
+
+  it('keeps the bill and supplier balance in yuan and stock cost in rupees', async () => {
+    const res = await api.post('/purchases', {
+      purchase_date: today(), supplier_id: chinaSupplier, exchange_rate: 40, paid_amount: 0,
+      lines: [{ product_id: front, pieces: Array(8).fill(16), rate: 28, rate_unit: 'meter' }],
+    });
+    assert.equal(res.status, 201);
+    purchase = res.data;
+    assert.equal(purchase.currency, 'CNY');
+    near(purchase.total_amount, 3277.21, 'bill in yuan');
+    near(purchase.total_pkr, 131088.4, 'bill in rupees');
+    const product = (await api.get(`/products/${front}`)).data;
+    near(product.stock_value, 131088.4, 'stock value in rupees');
+    const supplier = (await api.get(`/suppliers/${chinaSupplier}`)).data;
+    near(supplier.balance, 3277.21, 'supplier balance in yuan');
+  });
+
+  it('accepts an advance payment larger than the outstanding balance', async () => {
+    const res = await api.post('/payments/supplier', {
+      supplier_id: chinaSupplier, payment_date: today(), amount: 5000, exchange_rate: 40,
+    });
+    assert.equal(res.status, 201);
+    const supplier = (await api.get(`/suppliers/${chinaSupplier}`)).data;
+    near(supplier.balance, -1722.79, 'advance left with supplier');
+  });
+
+  it('adds shipping and tax to the stock cost without touching the yuan bill', async () => {
+    const key = randomUUID();
+    const body = { cost_date: today(), kind: 'shipping', description: 'Sea freight', amount: 10000 };
+    const first = await api.post(`/purchases/${purchase.id}/costs`, body, { key });
+    const second = await api.post(`/purchases/${purchase.id}/costs`, body, { key });
+    assert.equal(first.status, 201);
+    assert.equal(second.status, 201);
+    assert.equal(second.data.extra_costs.length, 1);
+    near(second.data.landed_cost_pkr, 141088.4, 'landed cost');
+    near(second.data.total_amount, 3277.21, 'yuan bill unchanged');
+    const product = (await api.get(`/products/${front}`)).data;
+    near(product.stock_value, 141088.4, 'stock value with shipping');
+    const integrity = (await api.get('/settings/integrity')).data;
+    assert.equal(integrity.ok, true, JSON.stringify(integrity.problems));
+  });
+
+  it('removes an extra cost and cancels the purchase cleanly', async () => {
+    const withCost = (await api.get(`/purchases/${purchase.id}`)).data;
+    const costId = withCost.extra_costs[0].id;
+    assert.equal((await api.post(`/purchases/costs/${costId}/void`, {})).status, 200);
+    assert.equal((await api.post(`/purchases/costs/${costId}/void`, {})).status, 409);
+    near((await api.get(`/products/${front}`)).data.stock_value, 131088.4, 'stock value after removing cost');
+    assert.equal((await api.post(`/purchases/${purchase.id}/cancel`, {})).status, 200);
+    const product = (await api.get(`/products/${front}`)).data;
+    near(product.stock_qty, 0, 'stock after cancel');
+    near(product.stock_value, 0, 'value after cancel');
+    const integrity = (await api.get('/settings/integrity')).data;
+    assert.equal(integrity.ok, true, JSON.stringify(integrity.problems));
+  });
+
+  it('shows what is owed to Chinese suppliers in yuan with a rupee estimate on the dashboard', async () => {
+    await api.put('/settings', { cny_pkr_rate: 40 });
+    const dash = (await api.get('/dashboard')).data;
+    near(dash.payable_cny, -5000, 'yuan payable');
+    near(dash.cny_pkr_rate, 40, 'rate');
   });
 });

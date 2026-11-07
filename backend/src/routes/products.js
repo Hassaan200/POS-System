@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/db.js';
 import { asyncHandler, idSchema, moneySchema, validate } from '../utils/http.js';
-import { createProduct, getProduct, listProducts, updateProduct } from '../services/products.js';
+import { createProduct, createProductSet, getProduct, listProducts, updateProduct } from '../services/products.js';
 
 const router = Router();
 
@@ -32,6 +32,17 @@ router.get('/', asyncHandler(async (req, res) => {
     category_id: category_id ? Number(category_id) : undefined,
     active: active === undefined ? undefined : active === 'true',
   }));
+}));
+
+const setSchema = z.object({
+  set_name: z.string().trim().min(1).max(100),
+  code: z.string().trim().min(1).max(40),
+  category_id: idSchema,
+  fabric_type_id: idSchema.nullable().optional(),
+});
+
+router.post('/set', validate(setSchema), asyncHandler(async (req, res) => {
+  res.status(201).json(await createProductSet(req.body, req.user.id));
 }));
 
 router.get('/:id', asyncHandler(async (req, res) => {

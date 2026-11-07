@@ -11,6 +11,7 @@ const settingsSchema = z.object({
   shop_name: z.string().trim().min(1).max(100).optional(),
   currency: z.string().trim().min(1).max(10).optional(),
   allow_oversell: z.boolean().optional(),
+  cny_pkr_rate: z.coerce.number().min(0).max(100000).optional(),
   timezone: z.string().trim().refine((tz) => {
     try { new Intl.DateTimeFormat('en', { timeZone: tz }); return true; } catch { return false; }
   }, 'Invalid timezone').optional(),

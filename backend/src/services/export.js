@@ -11,7 +11,8 @@ const fmtNumber = (value, type) => {
 
 const isNumeric = (type) => ['money', 'qty', 'int'].includes(type);
 
-export async function toExcel(report, { currency, shopName }) {
+export async function toExcel(report, { currency: shopCurrency, shopName }) {
+  const currency = report.currency || shopCurrency;
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Report');
   sheet.addRow([shopName]).font = { bold: true, size: 14 };
@@ -39,7 +40,8 @@ export async function toExcel(report, { currency, shopName }) {
   return Buffer.from(await workbook.xlsx.writeBuffer());
 }
 
-export function toPdf(report, { currency, shopName }) {
+export function toPdf(report, { currency: shopCurrency, shopName }) {
+  const currency = report.currency || shopCurrency;
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 30 });
     const chunks = [];

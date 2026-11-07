@@ -4,6 +4,8 @@ import { badRequest, conflict, notFound } from '../utils/errors.js';
 import {
   audit, findByKey, getSettings, insufficient, isDuplicateKeyError, lockParty, lockProducts, nextRef,
 } from './common.js';
+// === CHUNK 1: Naya units utility import add kiya ===
+import { lineAmount } from '../utils/units.js';
 
 export async function getSale(db, id) {
   const [[sale]] = await db.query(
@@ -63,7 +65,12 @@ export async function createSale(input, userId) {
       const products = await lockProducts(conn, input.lines.map((l) => l.product_id));
       const { allow_oversell: allowOversell } = await getSettings(conn);
 
-      const lines = input.lines.map((l) => ({ ...l, line_total: r2(l.quantity * l.rate) }));
+      // === CHUNK 2: Purani calculation hata kar dynamic unit tracker (lineAmount) use kiya ===
+      const lines = input.lines.map((l) => ({ 
+        ...l, 
+        line_total: lineAmount(l.quantity, l.rate, l.rate_unit) 
+      }));
+      
       const subtotal = r2(lines.reduce((sum, l) => sum + l.line_total, 0));
       if (input.discount > subtotal) throw badRequest('Discount cannot be more than the sale subtotal');
       const total = r2(subtotal - input.discount);
@@ -97,10 +104,11 @@ export async function createSale(input, userId) {
       const saleId = result.insertId;
 
       for (const line of lines) {
+        // === CHUNK 3: INSERT INTO sale_lines mein rate_unit ka naya column support add kiya ===
         await conn.query(
-          `INSERT INTO sale_lines (sale_id, product_id, quantity, rate, line_total, discount_share, cogs)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [saleId, line.product_id, line.quantity, line.rate, line.line_total, line.discount_share, line.cogs]
+          `INSERT INTO sale_lines (sale_id, product_id, quantity, rate, rate_unit, line_total, discount_share, cogs)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [saleId, line.product_id, line.quantity, line.rate, line.rate_unit, line.line_total, line.discount_share, line.cogs]
         );
         await conn.query(
           `INSERT INTO stock_movements (product_id, movement_type, quantity, value_change, ref_type, ref_id, movement_date)
@@ -159,7 +167,6 @@ export async function cancelSale(id, userId) {
     }
     await conn.query("UPDATE sales SET status = 'cancelled', cancelled_at = NOW() WHERE id = ?", [id]);
     await conn.query("UPDATE customer_payments SET status = 'void' WHERE sale_id = ? AND status = 'active'", [id]);
-    await audit(conn, userId, 'cancel', 'sale', id, sale.ref);
+    await audit(conn, userId, 'cancel', 'sale', id, `${sale.ref} cancelled`);
   });
-  return getSale(pool, id);
 }

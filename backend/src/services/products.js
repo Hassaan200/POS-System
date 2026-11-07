@@ -6,7 +6,7 @@ import { todayIn } from '../utils/dates.js';
 import { getSettings } from './common.js';
 
 const productSelect = `
-  SELECT p.id, p.name, p.code, p.category_id, c.name AS category_name, p.fabric_type_id, t.name AS type_name,
+  SELECT p.id, p.name, p.set_name, p.part, p.code, p.category_id, c.name AS category_name, p.fabric_type_id, t.name AS type_name,
     p.opening_stock, p.purchase_cost, p.selling_rate, p.purchased_qty, p.sold_qty, p.stock_qty, p.stock_value,
     CASE WHEN p.stock_qty > 0 THEN ROUND(p.stock_value / p.stock_qty, 4) ELSE p.purchase_cost END AS avg_cost,
     p.is_active
@@ -64,6 +64,33 @@ export async function createProduct(input, userId) {
     return result.insertId;
   });
   return getProduct(pool, id);
+}
+
+export const SET_PARTS = [
+  { part: 'front', label: 'Front', suffix: 'F' },
+  { part: 'back', label: 'Back', suffix: 'B' },
+  { part: 'dupatta', label: 'Dupatta', suffix: 'D' },
+];
+
+export async function createProductSet(input, userId) {
+  const ids = await withTransaction(async (conn) => {
+    const [[category]] = await conn.query('SELECT id FROM categories WHERE id = ?', [input.category_id]);
+    if (!category) throw badRequest('Category not found');
+    await checkTypeBelongsToCategory(conn, input.fabric_type_id, input.category_id);
+
+    const created = [];
+    for (const { part, label, suffix } of SET_PARTS) {
+      const code = `${input.code}-${suffix}`;
+      const [result] = await conn.query(
+        `INSERT INTO products (name, set_name, part, code, category_id, fabric_type_id) VALUES (?, ?, ?, ?, ?, ?)`,
+        [`${input.set_name} - ${label}`, input.set_name, part, code, input.category_id, input.fabric_type_id ?? null]
+      );
+      await audit(conn, userId, 'create', 'product', result.insertId, code);
+      created.push(result.insertId);
+    }
+    return created;
+  });
+  return Promise.all(ids.map((id) => getProduct(pool, id)));
 }
 
 export async function updateProduct(id, input, userId) {

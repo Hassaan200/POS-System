@@ -9,6 +9,7 @@ export async function getSettings(db = pool) {
     currency: map.currency,
     timezone: map.timezone,
     allow_oversell: map.allow_oversell === '1',
+    cny_pkr_rate: Number(map.cny_pkr_rate || 0),
   };
 }
 
