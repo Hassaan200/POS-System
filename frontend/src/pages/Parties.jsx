@@ -35,7 +35,7 @@ function PartyForm({ cfg, party, onClose, onSaved }) {
     setBusy(true);
     setError('');
     const payload = { name: form.name, mobile: form.mobile || null, opening_balance: Number(form.opening_balance) };
-    if (cfg.idField === 'supplier_id' && !party) payload.currency = form.currency;
+    if (cfg.idField === 'supplier_id') payload.currency = form.currency;
     try {
       if (party) await api.put(`${cfg.base}/${party.id}`, { ...payload, is_active: form.is_active });
       else await api.post(cfg.base, payload);
@@ -53,8 +53,8 @@ function PartyForm({ cfg, party, onClose, onSaved }) {
         <Field label="Name"><input required className={inputClass} value={form.name} onChange={set('name')} /></Field>
         <Field label="Mobile number"><input className={inputClass} value={form.mobile} onChange={set('mobile')} /></Field>
         {cfg.idField === 'supplier_id' && (
-          <Field label="Supplier currency" hint={party ? 'Cannot be changed after creation' : 'China suppliers: Yuan'}>
-            <select disabled={Boolean(party)} className={inputClass} value={form.currency} onChange={set('currency')}>
+          <Field label="Supplier currency" hint={party ? 'Can be changed only until the first purchase or payment is entered' : 'China suppliers: Yuan'}>
+            <select className={inputClass} value={form.currency} onChange={set('currency')}>
               <option value="CNY">Yuan (¥)</option>
               <option value="PKR">Rupees (PKR)</option>
             </select>

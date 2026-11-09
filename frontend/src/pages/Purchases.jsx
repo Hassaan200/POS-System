@@ -183,10 +183,10 @@ function CostForm({ purchase, onSaved }) {
   }
   return (
     <form onSubmit={submit} className="space-y-2 border border-dashed border-slate-300 p-3">
-      <div className="text-sm font-medium">Add shipping / tax (Rs)</div>
+      <div className="text-sm font-medium">Add shipping / clearing / tax (Rs)</div>
       <div className="grid grid-cols-3 gap-2">
         <select className={inputClass} value={form.kind} onChange={(e) => setForm({ ...form, kind: e.target.value })}>
-          <option value="shipping">Shipping</option><option value="customs">Tax / customs</option><option value="other">Other</option>
+          <option value="shipping">Shipping</option><option value="clearing">Clearing (port)</option><option value="customs">Tax / customs</option><option value="other">Other</option>
         </select>
         <input required type="number" min="0.01" step="0.01" placeholder="Amount Rs" className={inputClass} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
         <input placeholder="Note" className={inputClass} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />

@@ -2,7 +2,7 @@ import { after, before, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import ExcelJS from 'exceljs';
-import { createClient, resetDatabase, startServer, today } from './helpers.js';
+import { PASSWORD, createClient, resetDatabase, startServer, today } from './helpers.js';
 
 let server;
 let api;
@@ -650,5 +650,38 @@ describe('yuan supplier, advance payment and landed cost', () => {
     const dash = (await api.get('/dashboard')).data;
     near(dash.payable_cny, -5000, 'yuan payable');
     near(dash.cny_pkr_rate, 40, 'rate');
+  });
+});
+
+describe('supplier currency edit, clearing cost and data reset', () => {
+  it('lets the currency change only before any purchase or payment', async () => {
+    const fresh = await api.post('/suppliers', { name: 'Currency Mix-up Co', currency: 'PKR' });
+    assert.equal(fresh.status, 201);
+    const fixed = await api.put(`/suppliers/${fresh.data.id}`, { currency: 'CNY' });
+    assert.equal(fixed.status, 200);
+    assert.equal(fixed.data.currency, 'CNY');
+    const pay = await api.post('/payments/supplier', {
+      supplier_id: fresh.data.id, payment_date: today(), amount: 100, exchange_rate: 40,
+    });
+    assert.equal(pay.status, 201);
+    const blocked = await api.put(`/suppliers/${fresh.data.id}`, { currency: 'PKR' });
+    assert.equal(blocked.status, 409);
+  });
+
+  it('rejects a wrong password and a missing confirmation when deleting all data', async () => {
+    const noPhrase = await api.post('/settings/reset-data', { password: 'x', confirm: 'yes' });
+    assert.equal(noPhrase.status, 400);
+    const wrong = await api.post('/settings/reset-data', { password: 'wrong-password', confirm: 'DELETE ALL DATA' });
+    assert.equal(wrong.status, 400);
+  });
+
+  it('deletes all business data but keeps login and settings', async () => {
+    const res = await api.post('/settings/reset-data', { password: PASSWORD, confirm: 'DELETE ALL DATA' });
+    assert.equal(res.status, 200);
+    assert.deepEqual((await api.get('/products')).data, []);
+    assert.deepEqual((await api.get('/suppliers')).data, []);
+    assert.deepEqual((await api.get('/purchases')).data, []);
+    assert.equal((await api.get('/settings/integrity')).data.ok, true);
+    assert.equal((await api.get('/auth/me')).status, 200);
   });
 });

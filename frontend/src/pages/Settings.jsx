@@ -110,6 +110,50 @@ function IntegrityCheck() {
   );
 }
 
+function ResetData() {
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
+
+  async function run(e) {
+    e.preventDefault();
+    setError('');
+    try {
+      await api.post('/settings/reset-data', { confirm, password });
+      setDone(true);
+      setOpen(false);
+      setConfirm('');
+      setPassword('');
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <div className="space-y-3 rounded-xl border border-red-300 bg-white p-4">
+      <h2 className="font-semibold text-red-700">Delete all data</h2>
+      <p className="text-sm text-slate-600">
+        Removes all fabrics, sets, suppliers, customers, purchases, sales, payments and expenses. Login, shop settings and categories stay. This cannot be undone.
+      </p>
+      {done && <Notice message="All data deleted. You can start fresh." />}
+      {!open && <Button variant="danger" onClick={() => { setOpen(true); setDone(false); }}>Delete all data...</Button>}
+      {open && (
+        <form onSubmit={run} className="space-y-3">
+          <ErrorBox message={error} />
+          <Field label="Type DELETE ALL DATA to confirm"><input required className={inputClass} value={confirm} onChange={(e) => setConfirm(e.target.value)} /></Field>
+          <Field label="Your password"><input required type="password" autoComplete="current-password" className={inputClass} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="danger" type="submit">Delete everything</Button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
   return (
     <div>
@@ -118,6 +162,7 @@ export default function Settings() {
         <ShopSettings />
         <ChangePassword />
         <IntegrityCheck />
+        <ResetData />
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/db.js';
+import { conflict } from '../utils/errors.js';
 import { asyncHandler, dateSchema, idSchema, moneySchema, validate } from '../utils/http.js';
 import {
   customerStatement, getCustomer, getSupplier, listCustomers, listSuppliers, supplierStatement,
@@ -44,6 +45,14 @@ function buildRouter({ table, list, get, statement }) {
   router.put('/:id', validate(partyUpdateSchema), asyncHandler(async (req, res) => {
     const id = idSchema.parse(req.params.id);
     const current = await get(pool, id);
+    if (table === 'suppliers' && req.body.currency && req.body.currency !== current.currency) {
+      const [[used]] = await pool.query(
+        `SELECT (SELECT COUNT(*) FROM purchases WHERE supplier_id = ?) + (SELECT COUNT(*) FROM supplier_payments WHERE supplier_id = ?) AS n`,
+        [id, id]
+      );
+      if (used.n > 0) throw conflict('Currency cannot be changed because this supplier already has purchases or payments');
+      await pool.query('UPDATE suppliers SET currency = ? WHERE id = ?', [req.body.currency, id]);
+    }
     const next = {
       name: req.body.name ?? current.name,
       mobile: req.body.mobile === undefined ? current.mobile : req.body.mobile,

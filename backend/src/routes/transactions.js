@@ -54,7 +54,7 @@ const purchaseSchema = z.object({
 
 const purchaseCostSchema = z.object({
   cost_date: dateSchema,
-  kind: z.enum(['shipping', 'customs', 'other']),
+  kind: z.enum(['shipping', 'customs', 'clearing', 'other']),
   description: optionalText(),
   amount: positiveMoneySchema,
   idempotency_key: idempotencySchema,
