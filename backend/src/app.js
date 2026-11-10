@@ -45,3 +45,6 @@ export function createApp() {
   app.use(errorHandler);
   return app;
 }
+// === YEH LINE FILE KE END MEIN Vercel host ke lye ADD Kari hai ===
+const app = createApp();
+export default app;
