@@ -653,6 +653,31 @@ describe('yuan supplier, advance payment and landed cost', () => {
   });
 });
 
+describe('clearing payments', () => {
+  it('records a clearing payment, keeps it out of stock cost, and lowers net profit', async () => {
+    const before = (await api.get('/dashboard')).data.profit;
+    const res = await api.post('/clearing', { payment_date: today(), amount: 5000, agent_name: 'Port Agent', description: 'Container 1' });
+    assert.equal(res.status, 201);
+    const after = (await api.get('/dashboard')).data.profit;
+    near(after.clearing - before.clearing, 5000, 'clearing in period');
+    near(before.net_profit - after.net_profit, 5000, 'net profit drop');
+    assert.equal((await api.get('/settings/integrity')).data.ok, true);
+  });
+
+  it('is idempotent and can be voided', async () => {
+    const key = randomUUID();
+    const body = { payment_date: today(), amount: 700 };
+    const first = await api.post('/clearing', body, { key });
+    const again = await api.post('/clearing', body, { key });
+    assert.equal(again.data.id, first.data.id);
+    assert.equal(again.data.duplicate, true);
+    const voided = await api.post(`/clearing/${first.data.id}/void`);
+    assert.equal(voided.status, 200);
+    const twice = await api.post(`/clearing/${first.data.id}/void`);
+    assert.equal(twice.status, 409);
+  });
+});
+
 describe('supplier currency edit, clearing cost and data reset', () => {
   it('lets the currency change only before any purchase or payment', async () => {
     const fresh = await api.post('/suppliers', { name: 'Currency Mix-up Co', currency: 'PKR' });
@@ -681,6 +706,7 @@ describe('supplier currency edit, clearing cost and data reset', () => {
     assert.deepEqual((await api.get('/products')).data, []);
     assert.deepEqual((await api.get('/suppliers')).data, []);
     assert.deepEqual((await api.get('/purchases')).data, []);
+    assert.deepEqual((await api.get('/clearing')).data, []);
     assert.equal((await api.get('/settings/integrity')).data.ok, true);
     assert.equal((await api.get('/auth/me')).status, 200);
   });

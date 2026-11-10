@@ -3,7 +3,7 @@ import { audit } from './common.js';
 
 const TABLES = [
   'purchase_cost_shares', 'purchase_costs', 'purchase_line_pieces', 'purchase_lines', 'purchases',
-  'sale_lines', 'sales', 'customer_payments', 'supplier_payments', 'stock_movements', 'expenses',
+  'sale_lines', 'sales', 'customer_payments', 'supplier_payments', 'stock_movements', 'expenses', 'clearing_payments',
   'products', 'suppliers', 'customers', 'audit_log',
 ];
 

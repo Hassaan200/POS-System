@@ -12,6 +12,7 @@ import { customersRouter, suppliersRouter } from './routes/parties.js';
 import { paymentsRouter, purchasesRouter, salesRouter } from './routes/transactions.js';
 import { dashboardRouter, reportsRouter } from './routes/reports.js';
 import { expensesRouter } from './routes/expenses.js';
+import { clearingRouter } from './routes/clearing.js';
 
 export function createApp() {
   const app = express();
@@ -35,6 +36,7 @@ export function createApp() {
   app.use('/api/sales', salesRouter);
   app.use('/api/payments', paymentsRouter);
   app.use('/api/expenses', expensesRouter);
+  app.use('/api/clearing', clearingRouter);
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/reports', reportsRouter);
   app.use('/api/settings', settingsRouter);
@@ -43,6 +45,3 @@ export function createApp() {
   app.use(errorHandler);
   return app;
 }
-// === YEH LINE FILE KE END MEIN ADD KREIN ===
-const app = createApp();
-export default app;

@@ -213,6 +213,7 @@ export default function Dashboard() {
             <span className={`font-medium ${profit.gross_profit < 0 ? 'text-red-700' : ''}`}>{cur} {money(profit.gross_profit)}</span>
           </LedgerRow>
           <LedgerRow label="Shop expenses"><span>{cur} {money(profit.expenses)}</span></LedgerRow>
+          <LedgerRow label="Clearing paid"><span>{cur} {money(profit.clearing)}</span></LedgerRow>
           <div className="border-b-[3px] border-double border-black">
             <LedgerRow label="Net profit" strong>
               <Money value={profit.net_profit} className={`font-display text-3xl ${profit.net_profit < 0 ? 'text-red-700' : ''}`} />

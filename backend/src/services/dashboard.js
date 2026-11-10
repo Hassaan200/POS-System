@@ -4,6 +4,7 @@ import { monthStartIn, todayIn } from '../utils/dates.js';
 import { getSettings } from './common.js';
 import { listCustomers, listSuppliers } from './ledger.js';
 import { expenseTotal } from './expenses.js';
+import { clearingTotal } from './clearing.js';
 
 export async function getDashboard({ from, to } = {}) {
   const { timezone, currency, cny_pkr_rate: cnyRate } = await getSettings();
@@ -36,6 +37,8 @@ export async function getDashboard({ from, to } = {}) {
   const todayExpenses = await expenseTotal(pool, today, today);
   const periodExpenses = await expenseTotal(pool, periodFrom, periodTo);
 
+  const periodClearing = await clearingTotal(pool, periodFrom, periodTo);
+
   const customers = await listCustomers();
   const suppliers = await listSuppliers();
 
@@ -57,7 +60,8 @@ export async function getDashboard({ from, to } = {}) {
       cogs: r2(profit.cogs),
       gross_profit: r2(profit.revenue - profit.cogs),
       expenses: periodExpenses.total,
-      net_profit: r2(profit.revenue - profit.cogs - periodExpenses.total),
+      clearing: periodClearing,
+      net_profit: r2(profit.revenue - profit.cogs - periodExpenses.total - periodClearing),
     },
   };
 }

@@ -5,6 +5,7 @@ import useRate from '../lib/useRate.js';
 import Amount from '../components/Amount.jsx';
 import { Button, ErrorBox, Field, Modal, PageHeader, inputClass } from '../components/ui.jsx';
 import { PaymentForm, config } from './Parties.jsx';
+import Clearing from './Clearing.jsx';
 
 function PartyPicker({ kind, onPick, onClose }) {
   const [parties, setParties] = useState(null);
@@ -33,8 +34,15 @@ function PartyPicker({ kind, onPick, onClose }) {
   );
 }
 
+const tabClass = (on) => `rounded-lg px-4 py-2 text-sm ${on ? 'bg-slate-900 text-white' : 'border border-slate-300 bg-white'}`;
+
 export default function Payments() {
   const [kind, setKind] = useState('customer');
+  if (kind === 'clearing') return <Clearing onTab={setKind} tabClass={tabClass} />;
+  return <PartyPayments kind={kind} setKind={setKind} />;
+}
+
+function PartyPayments({ kind, setKind }) {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const [rows, setRows] = useState([]);
@@ -76,17 +84,12 @@ export default function Payments() {
   const total = active.reduce((sum, r) => sum + r.amount, 0);
   const totalCode = !isCustomer && active.length && active.every((r) => r.currency === 'CNY') ? 'CNY' : 'PKR';
   const tab = (value, label) => (
-    <button
-      onClick={() => setKind(value)}
-      className={`rounded-lg px-4 py-2 text-sm ${kind === value ? 'bg-slate-900 text-white' : 'border border-slate-300 bg-white'}`}
-    >
-      {label}
-    </button>
+    <button onClick={() => setKind(value)} className={tabClass(kind === value)}>{label}</button>
   );
 
   return (
     <div>
-      <PageHeader title="Payments">{tab('customer', 'Received from customers')}{tab('supplier', 'Paid to suppliers')}</PageHeader>
+      <PageHeader title="Payments">{tab('customer', 'Received from customers')}{tab('supplier', 'Paid to suppliers')}{tab('clearing', 'Clearing')}</PageHeader>
       <ErrorBox message={error} />
 
       <div className="my-4">
