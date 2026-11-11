@@ -111,59 +111,126 @@ function PurchaseForm({ products, suppliers, onClose, onSaved }) {
 
   return (
     <Modal title="New Purchase" onClose={onClose} wide>
-      <form onSubmit={submit} className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Field label="Date"><input required type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-          <Field label="Supplier">
-            <select required className={inputClass} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-              <option value="">Select supplier</option>
-              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.currency === 'CNY' ? '¥' : 'PKR'})</option>)}
+  {/* max-h-[80vh] aur overflow-y-auto se PC screen par modal kabhi cut nahi hoga */}
+  <form onSubmit={submit} className="max-h-[80vh] space-y-5 overflow-y-auto pr-1">
+    
+    {/* sm:grid-cols-3 ko md:grid-cols-3 kiya aur dynamic columns lagaye taake inputs ko khuli jagah mile */}
+    <div className={`grid grid-cols-1 gap-4 ${isCny ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+      <Field label="Date">
+        <input required type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
+      </Field>
+      <Field label="Supplier">
+        <select required className={inputClass} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
+          <option value="">Select supplier</option>
+          {suppliers.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name} ({s.currency === 'CNY' ? '¥' : 'PKR'})
+            </option>
+          ))}
+        </select>
+      </Field>
+      {isCny && (
+        <Field label="Rate today (PKR for 1 ¥)">
+          <input
+            type="number"
+            min="0"
+            step="0.0001"
+            inputMode="decimal"
+            className={inputClass}
+            placeholder={String(defaultRate || '')}
+            value={rateInput}
+            onChange={(e) => setRateInput(e.target.value)}
+          />
+        </Field>
+      )}
+    </div>
+
+    {/* Har block ko clean rounded card look aur flex-wrap diya */}
+    {blocks.map((b, i) => (
+      <div key={i} className="space-y-4 rounded-xl border border-slate-300 bg-slate-50/40 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {b.kind === 'set' ? (
+            <select
+              required
+              className={`${inputClass} w-full sm:w-64 md:w-72`}
+              value={b.set_name}
+              onChange={(e) => update(i)({ ...b, set_name: e.target.value })}
+            >
+              <option value="">Select set (e.g. D-1)</option>
+              {setNames.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
             </select>
-          </Field>
-          {isCny && (
-            <Field label="Rate today (PKR for 1 ¥)">
-              <input type="number" min="0" step="0.0001" inputMode="decimal" className={inputClass} placeholder={String(defaultRate || '')} value={rateInput} onChange={(e) => setRateInput(e.target.value)} />
-            </Field>
+          ) : (
+            <span className="text-sm font-semibold text-slate-800">Plain fabric</span>
           )}
-        </div>
 
-        {blocks.map((b, i) => (
-          <div key={i} className="space-y-3 border border-slate-300 p-3">
-            <div className="flex items-center justify-between gap-2">
-              {b.kind === 'set' ? (
-                <select required className={`${inputClass} sm:w-72`} value={b.set_name} onChange={(e) => update(i)({ ...b, set_name: e.target.value })}>
-                  <option value="">Select set (e.g. D-1)</option>
-                  {setNames.map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
-              ) : <span className="text-sm font-medium">Plain fabric</span>}
-              <div className="text-sm font-semibold">{cur(blockAmount(b), code)}</div>
-              {blocks.length > 1 && <button type="button" className="text-red-600" onClick={() => setBlocks(blocks.filter((_, idx) => idx !== i))}>Remove</button>}
-            </div>
-            {b.kind === 'set'
-              ? <><ThaanGrid block={b} onChange={update(i)} /><UnitRate block={b} onChange={update(i)} code={code} /></>
-              : <PlainBlock block={b} products={products} onChange={update(i)} code={code} />}
+          <div className="ml-auto flex items-center gap-4">
+            <div className="text-sm font-semibold text-slate-900">{cur(blockAmount(b), code)}</div>
+            {blocks.length > 1 && (
+              <button
+                type="button"
+                className="text-xs font-medium text-red-600 hover:underline"
+                onClick={() => setBlocks(blocks.filter((_, idx) => idx !== i))}
+              >
+                Remove
+              </button>
+            )}
           </div>
-        ))}
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => setBlocks([...blocks, emptySet()])}>+ Add set</Button>
-          <Button variant="secondary" onClick={() => setBlocks([...blocks, emptyPlain()])}>+ Add plain fabric</Button>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Field label={`Paid now (${isCny ? '¥' : 'Rs'})`}>
-            <input type="number" min="0" step="0.01" inputMode="decimal" className={inputClass} value={paid} onChange={(e) => setPaid(e.target.value)} />
-          </Field>
-          <div className="bg-slate-50 px-3 py-2 text-sm">Bill total<div className="text-lg font-semibold"><Amount value={total} currency={code} rate={rate} /></div></div>
-          <div className="bg-slate-50 px-3 py-2 text-sm">Remaining<div className="text-lg font-semibold"><Amount value={total - Number(paid || 0)} currency={code} rate={rate} /></div></div>
-        </div>
-        <Field label="Note (optional)"><input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
-        <ErrorBox message={error} />
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save purchase'}</Button>
-        </div>
-      </form>
-    </Modal>
+        {b.kind === 'set' ? (
+          <>
+            <ThaanGrid block={b} onChange={update(i)} />
+            <UnitRate block={b} onChange={update(i)} code={code} />
+          </>
+        ) : (
+          <PlainBlock block={b} products={products} onChange={update(i)} code={code} />
+        )}
+      </div>
+    ))}
+
+    <div className="flex flex-wrap gap-2">
+      <Button variant="secondary" onClick={() => setBlocks([...blocks, emptySet()])}>+ Add set</Button>
+      <Button variant="secondary" onClick={() => setBlocks([...blocks, emptyPlain()])}>+ Add plain fabric</Button>
+    </div>
+
+    {/* Bottom Totals section ko PC par proper alignment aur border diya */}
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <Field label={`Paid now (${isCny ? '¥' : 'Rs'})`}>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          className={inputClass}
+          value={paid}
+          onChange={(e) => setPaid(e.target.value)}
+        />
+      </Field>
+      <div className="flex flex-col justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm">
+        <span className="text-xs text-slate-500">Bill total</span>
+        <div className="text-lg font-semibold"><Amount value={total} currency={code} rate={rate} /></div>
+      </div>
+      <div className="flex flex-col justify-center rounded-lg border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm">
+        <span className="text-xs text-slate-500">Remaining</span>
+        <div className="text-lg font-semibold"><Amount value={total - Number(paid || 0)} currency={code} rate={rate} /></div>
+      </div>
+    </div>
+
+    <Field label="Note (optional)">
+      <input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} />
+    </Field>
+
+    <ErrorBox message={error} />
+
+    <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+      <Button variant="secondary" onClick={onClose}>Cancel</Button>
+      <Button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save purchase'}</Button>
+    </div>
+  </form>
+</Modal>
+
   );
 }
 

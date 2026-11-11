@@ -52,53 +52,82 @@ function SaleForm({ products, customers, onClose, onSaved }) {
 
   return (
     <Modal title="New Sale" onClose={onClose} wide>
-      <form onSubmit={submit} className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Date"><input required type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} /></Field>
-          <Field label="Customer" hint={customerId ? '' : 'Walk-in sales must be paid in full'}>
-            <select className={inputClass} value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
-              <option value="">Walk-in customer</option>
-              <option value="new">+ New customer (add name and number)</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.name}{c.mobile ? ` (${c.mobile})` : ''}</option>)}
-            </select>
-          </Field>
-        </div>
-        {customerId === 'new' && (
-          <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-2">
-            <Field label="New customer name">
-              <input required className={inputClass} value={newName} onChange={(e) => { setNewName(e.target.value); createdId.current = null; }} />
-            </Field>
-            <Field label="Mobile number" hint="If this number already exists, that customer is used">
-              <input className={inputClass} inputMode="tel" value={newMobile} onChange={(e) => { setNewMobile(e.target.value); createdId.current = null; }} />
-            </Field>
-          </div>
-        )}
-        <LinesEditor products={products} lines={lines} onChange={setLines} mode="sale" />
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Field label="Discount (optional)">
-            <input type="number" min="0" step="0.01" inputMode="decimal" className={inputClass} value={discount} onChange={(e) => setDiscount(e.target.value)} />
-          </Field>
-          <Field label="Amount received now" hint="Leave empty if the full amount is received">
-            <input
-              type="number" min="0" step="0.01" inputMode="decimal" className={inputClass}
-              placeholder={String(Math.round(total * 100) / 100)}
-              value={received} onChange={(e) => setReceived(e.target.value)}
-            />
-          </Field>
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">Subtotal<div className="text-lg font-semibold">{money(subtotal)}</div></div>
-          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">Total sale<div className="text-lg font-semibold">{money(total)}</div></div>
-          <div className="rounded-lg bg-slate-50 px-3 py-2 text-sm">Customer balance<div className="text-lg font-semibold">{money(remaining)}</div></div>
-        </div>
-        <Field label="Note (optional)"><input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} /></Field>
-        <ErrorBox message={error} />
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>Cancel</Button>
-          <Button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save sale'}</Button>
-        </div>
-      </form>
-    </Modal>
+  {/* max-h-[82vh] aur overflow-y-auto se form PC screen par kabhi crop nahi hoga */}
+  <form onSubmit={submit} className="max-h-[82vh] space-y-4 overflow-y-auto pr-1">
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <Field label="Date">
+        <input required type="date" className={inputClass} value={date} onChange={(e) => setDate(e.target.value)} />
+      </Field>
+      <Field label="Customer" hint={customerId ? '' : 'Walk-in sales must be paid in full'}>
+        <select className={inputClass} value={customerId} onChange={(e) => setCustomerId(e.target.value)}>
+          <option value="">Walk-in customer</option>
+          <option value="new">+ New customer (add name and number)</option>
+          {customers.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}{c.mobile ? ` (${c.mobile})` : ''}
+            </option>
+          ))}
+        </select>
+      </Field>
+    </div>
+
+    {customerId === 'new' && (
+      <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-slate-50/50 p-3 md:grid-cols-2">
+        <Field label="New customer name">
+          <input required className={inputClass} value={newName} onChange={(e) => { setNewName(e.target.value); createdId.current = null; }} />
+        </Field>
+        <Field label="Mobile number" hint="If this number already exists, that customer is used">
+          <input className={inputClass} inputMode="tel" value={newMobile} onChange={(e) => { setNewMobile(e.target.value); createdId.current = null; }} />
+        </Field>
+      </div>
+    )}
+
+    {/* min-w-0 aur overflow-x-auto se LinesEditor kabhi side se crop nahi hoga */}
+    <div className="min-w-0 overflow-x-auto">
+      <LinesEditor products={products} lines={lines} onChange={setLines} mode="sale" />
+    </div>
+
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+      <Field label="Discount (optional)">
+        <input type="number" min="0" step="0.01" inputMode="decimal" className={inputClass} value={discount} onChange={(e) => setDiscount(e.target.value)} />
+      </Field>
+      <Field label="Amount received now" hint="Leave empty if the full amount is received">
+        <input
+          type="number" min="0" step="0.01" inputMode="decimal" className={inputClass}
+          placeholder={String(Math.round(total * 100) / 100)}
+          value={received} onChange={(e) => setReceived(e.target.value)}
+        />
+      </Field>
+    </div>
+
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+        <span className="text-xs text-slate-500">Subtotal</span>
+        <div className="text-lg font-semibold">{money(subtotal)}</div>
+      </div>
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+        <span className="text-xs text-slate-500">Total sale</span>
+        <div className="text-lg font-semibold">{money(total)}</div>
+      </div>
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+        <span className="text-xs text-slate-500">Customer balance</span>
+        <div className="text-lg font-semibold">{money(remaining)}</div>
+      </div>
+    </div>
+
+    <Field label="Note (optional)">
+      <input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} />
+    </Field>
+
+    <ErrorBox message={error} />
+
+    <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+      <Button variant="secondary" onClick={onClose}>Cancel</Button>
+      <Button type="submit" disabled={busy}>{busy ? 'Saving...' : 'Save sale'}</Button>
+    </div>
+  </form>
+</Modal>
+
   );
 }
 

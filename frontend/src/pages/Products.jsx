@@ -178,58 +178,76 @@ function CatalogManager({ catalog, onClose, onChanged }) {
   }
 
   return (
-    <Modal title="Categories & Fabric Types" onClose={onClose}>
-      <div className="space-y-4">
-        <ErrorBox message={error} />
-        {catalog.map((category) => (
-          <div key={category.id} className="rounded-lg border border-slate-200 p-3">
-            <div className="font-medium">{category.name}</div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {category.types.length === 0 && <span className="text-sm text-slate-500">No types yet</span>}
-              {category.types.map((t) => (
-                <span key={t.id} className="rounded-full bg-slate-100 px-3 py-1 text-sm">{t.name}</span>
-              ))}
-            </div>
-            <form
-              className="mt-3 flex gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const name = (typeNames[category.id] || '').trim();
-                if (!name) return;
-                run(async () => {
-                  const data = await api.post(`/catalog/categories/${category.id}/types`, { name });
-                  setTypeNames((s) => ({ ...s, [category.id]: '' }));
-                  return data;
-                });
-              }}
-            >
-              <input
-                className={inputClass} placeholder="New type name"
-                value={typeNames[category.id] || ''}
-                onChange={(e) => setTypeNames((s) => ({ ...s, [category.id]: e.target.value }))}
-              />
-              <Button type="submit" variant="secondary">Add</Button>
-            </form>
+    <Modal title="Categories & Fabric Types" onClose={onClose} wide>
+  <div className="flex max-h-[80vh] flex-col">
+    <ErrorBox message={error} />
+
+    {/* Scrollable area: Categories ki list yahan smoothly scroll hogi */}
+    <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+      {catalog.length === 0 && (
+        <p className="py-6 text-center text-sm text-slate-500">No categories added yet. Add one below.</p>
+      )}
+      {catalog.map((category) => (
+        <div key={category.id} className="rounded-xl border border-slate-200 bg-slate-50/40 p-4">
+          <div className="font-semibold text-slate-900">{category.name}</div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {category.types.length === 0 && <span className="text-sm text-slate-500">No types yet</span>}
+            {category.types.map((t) => (
+              <span key={t.id} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+                {t.name}
+              </span>
+            ))}
           </div>
-        ))}
-        <form
-          className="flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const name = newCategory.trim();
-            if (!name) return;
-            run(async () => {
-              const data = await api.post('/catalog/categories', { name });
-              setNewCategory('');
-              return data;
-            });
-          }}
-        >
-          <input className={inputClass} placeholder="New category name" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} />
-          <Button type="submit">Add category</Button>
-        </form>
-      </div>
-    </Modal>
+          <form
+            className="mt-3 flex flex-col gap-2 sm:flex-row"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const name = (typeNames[category.id] || '').trim();
+              if (!name) return;
+              run(async () => {
+                const data = await api.post(`/catalog/categories/${category.id}/types`, { name });
+                setTypeNames((s) => ({ ...s, [category.id]: '' }));
+                return data;
+              });
+            }}
+          >
+            <input
+              className={`${inputClass} min-w-0 flex-1`}
+              placeholder="New type name (e.g. Lawn, Cotton)"
+              value={typeNames[category.id] || ''}
+              onChange={(e) => setTypeNames((s) => ({ ...s, [category.id]: e.target.value }))}
+            />
+            <Button type="submit" variant="secondary" className="shrink-0">Add</Button>
+          </form>
+        </div>
+      ))}
+    </div>
+
+    {/* Fixed Bottom Bar: Nayi category add karne ka form hamesha samne rahega */}
+    <form
+      className="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-4 sm:flex-row"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const name = newCategory.trim();
+        if (!name) return;
+        run(async () => {
+          const data = await api.post('/catalog/categories', { name });
+          setNewCategory('');
+          return data;
+        });
+      }}
+    >
+      <input
+        className={`${inputClass} min-w-0 flex-1`}
+        placeholder="New category name"
+        value={newCategory}
+        onChange={(e) => setNewCategory(e.target.value)}
+      />
+      <Button type="submit" className="shrink-0">Add category</Button>
+    </form>
+  </div>
+</Modal>
+
   );
 }
 
