@@ -7,6 +7,7 @@ import Purchases from './pages/Purchases.jsx';
 import Sales from './pages/Sales.jsx';
 import { Customers, Suppliers } from './pages/Parties.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import Containers from './pages/Containers.jsx';
 import Payments from './pages/Payments.jsx';
 import DailyBook from './pages/DailyBook.jsx';
 import Reports from './pages/Reports.jsx';
@@ -16,6 +17,7 @@ const pages = {
   '/': <Dashboard />,
   '/daily-book': <DailyBook />,
   '/payments': <Payments />,
+  '/containers': <Containers />,
   '/reports': <Reports />,
   '/settings': <Settings />,
   '/products': <Products />,

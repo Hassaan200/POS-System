@@ -13,6 +13,7 @@ import { paymentsRouter, purchasesRouter, salesRouter } from './routes/transacti
 import { dashboardRouter, reportsRouter } from './routes/reports.js';
 import { expensesRouter } from './routes/expenses.js';
 import { clearingRouter } from './routes/clearing.js';
+import { containersRouter } from './routes/containers.js';
 
 export function createApp() {
   const app = express();
@@ -37,6 +38,7 @@ export function createApp() {
   app.use('/api/payments', paymentsRouter);
   app.use('/api/expenses', expensesRouter);
   app.use('/api/clearing', clearingRouter);
+  app.use('/api/containers', containersRouter);
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/reports', reportsRouter);
   app.use('/api/settings', settingsRouter);
@@ -45,6 +47,3 @@ export function createApp() {
   app.use(errorHandler);
   return app;
 }
-// === YEH LINE FILE KE END MEIN Vercel host ke lye ADD Kari hai ===
-const app = createApp();
-export default app;

@@ -11,6 +11,7 @@ export const navItems = [
   { to: '/customers', label: 'Customers', icon: 'customers' },
   { to: '/suppliers', label: 'Suppliers', icon: 'suppliers' },
   { to: '/payments', label: 'Payments', icon: 'payments' },
+  { to: '/containers', label: 'Containers', icon: 'containers' },
   { to: '/reports', label: 'Reports', icon: 'reports' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];
@@ -24,6 +25,7 @@ const icons = {
   customers: <path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M9 4.5a3.5 3.5 0 100 7 3.5 3.5 0 000-7zM17 14c2.8 0 4.5 1.8 4.5 4.5M17 6.5a2.5 2.5 0 110 5" />,
   suppliers: <path d="M3 6h11v10H3zM14 10h4l3 3v3h-7M7 16.5a1.8 1.8 0 100 3.6 1.8 1.8 0 000-3.6zM17 16.5a1.8 1.8 0 100 3.6 1.8 1.8 0 000-3.6z" />,
   payments: <path d="M3 6h18v12H3zM12 9.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5zM6 9v.01M18 15v.01" />,
+  containers: <path d="M3 7h18v11H3zM7 7v11M11 7v11M15 7v11M19 7v11" />,
   reports: <path d="M4 20h16M7 20v-9M12 20V5M17 20v-6" />,
   settings: <path d="M4 7h10M18 7h2M4 17h2M10 17h10M16 4.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5zM8 14.5a2.5 2.5 0 100 5 2.5 2.5 0 000-5z" />,
 };

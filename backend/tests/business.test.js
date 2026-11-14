@@ -711,3 +711,38 @@ describe('supplier currency edit, clearing cost and data reset', () => {
     assert.equal((await api.get('/auth/me')).status, 200);
   });
 });
+
+describe('container deliveries', () => {
+  it('records a container with date, number, name, weight and bales', async () => {
+    const res = await api.post('/containers', {
+      delivery_date: today(), container_no: 'trhu5482542', party_name: 'Zia Durrani Khi', weight_kg: 245, bales: 4,
+    });
+    assert.equal(res.status, 201);
+    assert.equal(res.data.container_no, 'TRHU5482542');
+    assert.equal(res.data.bales, 4);
+    const second = await api.post('/containers', {
+      delivery_date: today(), container_no: 'TRHU5482542', party_name: 'Zia Net', weight_kg: 180, bales: 3,
+    });
+    assert.equal(second.status, 201);
+    const found = await api.get('/containers?search=TRHU5482542');
+    assert.equal(found.data.length, 2);
+  });
+
+  it('is idempotent, editable and can be voided', async () => {
+    const key = randomUUID();
+    const body = { delivery_date: today(), container_no: 'EGSU0321326', party_name: 'Zia', weight_kg: 1753, bales: 17 };
+    const first = await api.post('/containers', body, { key });
+    const again = await api.post('/containers', body, { key });
+    assert.equal(again.data.id, first.data.id);
+    const edited = await api.put(`/containers/${first.data.id}`, { ...body, bales: 18 });
+    assert.equal(edited.data.bales, 18);
+    assert.equal((await api.post(`/containers/${first.data.id}/void`)).status, 200);
+    assert.equal((await api.post(`/containers/${first.data.id}/void`)).status, 409);
+    assert.equal((await api.put(`/containers/${first.data.id}`, body)).status, 409);
+  });
+
+  it('rejects a missing container number', async () => {
+    const res = await api.post('/containers', { delivery_date: today(), container_no: ' ', party_name: 'Zia', weight_kg: 10, bales: 1 });
+    assert.equal(res.status, 400);
+  });
+});
