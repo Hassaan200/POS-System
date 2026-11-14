@@ -50,7 +50,7 @@ export function PageHeader({ title, children }) {
   );
 }
 
-export function Modal({ title, onClose, children, wide = false }) {
+export function Modal({ title, onClose, children, wide = false, footer = null }) {
   useEffect(() => {
     const onKey = (event) => event.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -58,12 +58,12 @@ export function Modal({ title, onClose, children, wide = false }) {
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-[2px] sm:items-center">
+    <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto overscroll-contain bg-black/60 p-2 backdrop-blur-[2px] sm:p-4">
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`modal-panel w-full ${wide ? 'max-w-3xl' : 'max-w-lg'} border border-black bg-white p-6 shadow-[0_24px_60px_rgba(0,0,0,0.35)]`}
+        className={`modal-panel my-auto w-full ${wide ? 'max-w-5xl' : 'max-w-lg'} border border-black bg-white p-4 shadow-[0_24px_60px_rgba(0,0,0,0.35)] sm:p-6`}
       >
         <div className="mb-5 flex items-start justify-between gap-4">
           <h2>{title}</h2>
@@ -74,6 +74,7 @@ export function Modal({ title, onClose, children, wide = false }) {
           </button>
         </div>
         {children}
+        {footer && <div className="sticky bottom-0 -mx-4 mt-4 border-t border-slate-200 bg-white px-4 py-3 sm:-mx-6 sm:px-6">{footer}</div>}
       </div>
     </div>
   );
