@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, newKey } from '../lib/api.js';
-import { cur, today } from '../lib/format.js';
+import { cur, qty, toMeters, today } from '../lib/format.js';
 import useRate from '../lib/useRate.js';
 import Amount from '../components/Amount.jsx';
 import { Button, ErrorBox, Field, Modal, PageHeader, inputClass } from '../components/ui.jsx';
@@ -132,9 +132,39 @@ export function PaymentForm({ cfg, party, onClose, onSaved }) {
   );
 }
 
+function ItemsTable({ lines, code, showMeters }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs sm:text-sm">
+        <thead className="text-left text-xs uppercase text-slate-500">
+          <tr>
+            <th className="px-1.5 py-1 sm:px-2">Fabric</th>
+            <th className="px-2 py-1 text-right">Yards</th>
+            {showMeters && <th className="px-2 py-1 text-right">Meters</th>}
+            <th className="px-2 py-1 text-right">Rate</th>
+            <th className="px-2 py-1 text-right">Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((l, i) => (
+            <tr key={i} className="border-t border-slate-100">
+              <td className="px-1.5 py-1.5 sm:px-2">{l.name}</td>
+              <td className="px-2 py-1.5 text-right">{qty(l.quantity)}</td>
+              {showMeters && <td className="px-2 py-1.5 text-right">{toMeters(l.quantity).toFixed(2)}</td>}
+              <td className="px-1.5 py-1.5 text-right sm:px-2 sm:whitespace-nowrap">{cur(l.rate, code)}/{l.rate_unit === 'meter' ? 'm' : 'yd'}</td>
+              <td className="px-1.5 py-1.5 text-right font-medium sm:px-2">{cur(l.line_total, code)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function Statement({ cfg, party, onClose }) {
   const code = party.currency || 'PKR';
   const fmt = (v) => cur(v, code);
+  const isSupplier = cfg.idField === 'supplier_id';
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
@@ -142,38 +172,48 @@ function Statement({ cfg, party, onClose }) {
     api.get(`${cfg.base}/${party.id}/statement`).then(setData).catch((err) => setError(err.message));
   }, [cfg.base, party.id]);
 
+  const totalDebit = data ? data.rows.reduce((sum, r) => sum + r.debit, 0) : 0;
+  const totalCredit = data ? data.rows.reduce((sum, r) => sum + r.credit, 0) : 0;
+
   return (
-    <Modal title={`Statement - ${party.name}`} onClose={onClose} wide>
+    <Modal title={party.name} onClose={onClose} wide>
       <ErrorBox message={error} />
       {!data && !error && <div className="text-sm text-slate-500">Loading...</div>}
       {data && (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left text-xs uppercase text-slate-500">
-              <tr>
-                <th className="px-2 py-2">Date</th><th className="px-2 py-2">Ref</th><th className="px-2 py-2">Details</th>
-                <th className="px-2 py-2 text-right">{cfg.debitLabel}</th><th className="px-2 py-2 text-right">{cfg.creditLabel}</th>
-                <th className="px-2 py-2 text-right">Balance</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr className="border-t border-slate-100 text-slate-500">
-                <td className="px-2 py-2" colSpan="5">Opening balance</td>
-                <td className="px-2 py-2 text-right">{fmt(data.opening_balance)}</td>
-              </tr>
-              {data.rows.map((r) => (
-                <tr key={`${r.kind}-${r.id}`} className="border-t border-slate-100 align-top">
-                  <td className="whitespace-nowrap px-2 py-2">{r.date}</td>
-                  <td className="px-2 py-2">{r.reference}</td>
-                  <td className="px-2 py-2">{r.description}</td>
-                  <td className="px-2 py-2 text-right">{r.debit ? fmt(r.debit) : ''}</td>
-                  <td className="px-2 py-2 text-right">{r.credit ? fmt(r.credit) : ''}</td>
-                  <td className="px-2 py-2 text-right font-medium">{fmt(r.balance)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="mt-3 text-right text-sm font-semibold">Outstanding: {fmt(data.customer?.balance ?? data.supplier?.balance)}</div>
+        <div className="space-y-4">
+          <div className="grid grid-cols-3 gap-3 text-sm">
+            <div className="bg-slate-50 px-3 py-2"><div className="text-xs text-slate-500">{cfg.totalLabel}</div><div className="font-semibold">{fmt(totalDebit)}</div></div>
+            <div className="bg-slate-50 px-3 py-2"><div className="text-xs text-slate-500">{cfg.paidLabel}</div><div className="font-semibold">{fmt(totalCredit)}</div></div>
+            <div className="bg-slate-50 px-3 py-2"><div className="text-xs text-slate-500">{cfg.balanceLabel}</div><div className="font-semibold">{fmt(data.customer?.balance ?? data.supplier?.balance)}</div></div>
+          </div>
+          {data.opening_balance !== 0 && (
+            <div className="flex justify-between border border-slate-200 px-3 py-2 text-sm text-slate-600">
+              <span>Opening balance</span><span>{fmt(data.opening_balance)}</span>
+            </div>
+          )}
+          {data.rows.length === 0 && <div className="text-sm text-slate-500">Nothing recorded yet.</div>}
+          {data.rows.map((r) => {
+            const isPayment = r.kind === 'payment';
+            return (
+              <div key={`${r.kind}-${r.id}`} className={`border ${isPayment ? 'border-slate-200' : 'border-black'}`}>
+                <div className={`flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-3 py-2 ${isPayment ? 'bg-white' : 'bg-slate-50'}`}>
+                  <div className="text-sm">
+                    <span className="font-medium">{r.date}</span>
+                    <span className="ml-3 font-mono text-xs text-slate-500">{r.reference}</span>
+                    <span className="ml-3 text-xs uppercase tracking-wide text-slate-500">
+                      {isPayment ? cfg.creditLabel : cfg.debitLabel}
+                    </span>
+                  </div>
+                  <div className="text-sm font-semibold">
+                    {isPayment ? `- ${fmt(r.credit)}` : fmt(r.debit)}
+                    <span className="ml-3 text-xs font-normal text-slate-500">Balance {fmt(r.balance)}</span>
+                  </div>
+                </div>
+                {isPayment && r.description && <div className="px-3 pb-2 text-xs text-slate-500">{r.description}</div>}
+                {!isPayment && r.lines?.length > 0 && <ItemsTable lines={r.lines} code={code} showMeters={isSupplier} />}
+              </div>
+            );
+          })}
         </div>
       )}
     </Modal>
@@ -247,7 +287,7 @@ function PartyPage({ kind }) {
             {visible.map((p) => (
               <tr key={p.id} className="border-t border-slate-100">
                 <td className="px-3 py-2">
-                  <div className="font-medium">{p.name}{!p.is_active && <span className="ml-2 text-xs text-slate-400">(inactive)</span>}</div>
+                  <div className="font-medium"><button className="text-left underline-offset-2 hover:underline" onClick={() => setDialog({ type: 'statement', party: p })}>{p.name}</button>{!p.is_active && <span className="ml-2 text-xs text-slate-400">(inactive)</span>}</div>
                   <div className="text-xs text-slate-500">{p.mobile || 'No mobile'}</div>
                   <div className="mt-2 flex flex-wrap gap-2 md:hidden">
                     <button className="rounded-lg border border-slate-300 px-3 py-1 text-xs" onClick={() => setDialog({ type: 'statement', party: p })}>Statement</button>

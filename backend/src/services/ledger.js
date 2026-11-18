@@ -63,6 +63,26 @@ export async function getSupplier(db = pool, id) {
   return withSupplierBalance(row);
 }
 
+async function linesFor(db, table, parentColumn, ids) {
+  const map = new Map();
+  if (!ids.length) return map;
+  const [rows] = await db.query(
+    `SELECT l.${parentColumn} AS parent_id, l.quantity, l.rate, l.rate_unit, l.line_total, p.name, p.set_name, p.part
+     FROM ${table} l JOIN products p ON p.id = l.product_id
+     WHERE l.${parentColumn} IN (?) ORDER BY l.id`,
+    [ids]
+  );
+  for (const row of rows) {
+    const { parent_id: parentId, ...line } = row;
+    if (!map.has(parentId)) map.set(parentId, []);
+    map.get(parentId).push(line);
+  }
+  return map;
+}
+
+const describeLines = (lines) =>
+  lines.map((l) => `${l.name} ${l.quantity} yd @ ${l.rate}/${l.rate_unit}`).join('; ');
+
 function sortAndRun(entries, opening) {
   entries.sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at) || a.id - b.id);
   let running = opening;
@@ -75,12 +95,11 @@ function sortAndRun(entries, opening) {
 export async function customerStatement(db = pool, id, { from, to } = {}) {
   const customer = await getCustomer(db, id);
   const [sales] = await db.query(
-    `SELECT s.id, s.ref, s.sale_date AS date, s.total_amount, s.discount, s.created_at,
-       GROUP_CONCAT(CONCAT(p.name, ' ', sl.quantity, 'yd @ ', sl.rate, '/', sl.rate_unit) ORDER BY sl.id SEPARATOR '; ') AS items
-     FROM sales s JOIN sale_lines sl ON sl.sale_id = s.id JOIN products p ON p.id = sl.product_id
-     WHERE s.customer_id = ? AND s.status = 'active' GROUP BY s.id`,
+    `SELECT s.id, s.ref, s.sale_date AS date, s.total_amount, s.discount, s.created_at
+     FROM sales s WHERE s.customer_id = ? AND s.status = 'active'`,
     [id]
   );
+  const saleLines = await linesFor(db, 'sale_lines', 'sale_id', sales.map((s) => s.id));
   const [payments] = await db.query(
     `SELECT p.id, p.payment_date AS date, p.amount, p.notes, p.created_at, s.ref AS sale_ref
      FROM customer_payments p LEFT JOIN sales s ON s.id = p.sale_id
@@ -88,10 +107,13 @@ export async function customerStatement(db = pool, id, { from, to } = {}) {
     [id]
   );
   const entries = [
-    ...sales.map((s) => ({
-      id: s.id, kind: 'sale', date: s.date, created_at: s.created_at, reference: s.ref,
-      description: s.items + (s.discount > 0 ? ` (discount ${s.discount})` : ''), debit: s.total_amount, credit: 0,
-    })),
+    ...sales.map((s) => {
+      const lines = saleLines.get(s.id) || [];
+      return {
+        id: s.id, kind: 'sale', date: s.date, created_at: s.created_at, reference: s.ref, lines,
+        description: describeLines(lines) + (s.discount > 0 ? ` (discount ${s.discount})` : ''), debit: s.total_amount, credit: 0,
+      };
+    }),
     ...payments.map((p) => ({
       id: p.id, kind: 'payment', date: p.date, created_at: p.created_at, reference: p.sale_ref || '',
       description: p.notes || 'Payment received', debit: 0, credit: p.amount,
@@ -105,12 +127,11 @@ export async function customerStatement(db = pool, id, { from, to } = {}) {
 export async function supplierStatement(db = pool, id, { from, to } = {}) {
   const supplier = await getSupplier(db, id);
   const [purchases] = await db.query(
-    `SELECT p.id, p.ref, p.purchase_date AS date, p.total_amount, p.created_at,
-       GROUP_CONCAT(CONCAT(pr.name, ' ', pl.quantity, 'yd @ ', pl.rate, '/', pl.rate_unit) ORDER BY pl.id SEPARATOR '; ') AS items
-     FROM purchases p JOIN purchase_lines pl ON pl.purchase_id = p.id JOIN products pr ON pr.id = pl.product_id
-     WHERE p.supplier_id = ? AND p.status = 'active' GROUP BY p.id`,
+    `SELECT p.id, p.ref, p.purchase_date AS date, p.total_amount, p.created_at
+     FROM purchases p WHERE p.supplier_id = ? AND p.status = 'active'`,
     [id]
   );
+  const purchaseLines = await linesFor(db, 'purchase_lines', 'purchase_id', purchases.map((p) => p.id));
   const [payments] = await db.query(
     `SELECT sp.id, sp.payment_date AS date, sp.amount, sp.notes, sp.created_at, p.ref AS purchase_ref
      FROM supplier_payments sp LEFT JOIN purchases p ON p.id = sp.purchase_id
@@ -118,10 +139,13 @@ export async function supplierStatement(db = pool, id, { from, to } = {}) {
     [id]
   );
   const entries = [
-    ...purchases.map((p) => ({
-      id: p.id, kind: 'purchase', date: p.date, created_at: p.created_at, reference: p.ref,
-      description: p.items, debit: p.total_amount, credit: 0,
-    })),
+    ...purchases.map((p) => {
+      const lines = purchaseLines.get(p.id) || [];
+      return {
+        id: p.id, kind: 'purchase', date: p.date, created_at: p.created_at, reference: p.ref, lines,
+        description: describeLines(lines), debit: p.total_amount, credit: 0,
+      };
+    }),
     ...payments.map((p) => ({
       id: p.id, kind: 'payment', date: p.date, created_at: p.created_at, reference: p.purchase_ref || '',
       description: p.notes || 'Payment made', debit: 0, credit: p.amount,

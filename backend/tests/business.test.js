@@ -303,6 +303,9 @@ describe('payments', () => {
     const last = statement.rows.at(-1);
     near(last.balance, statement.customer.balance, 'statement closing balance');
     assert.ok(statement.rows.some((r) => r.kind === 'sale'));
+    const saleRow = statement.rows.find((r) => r.kind === 'sale');
+    assert.ok(saleRow.lines.length > 0);
+    assert.ok(saleRow.lines.every((l) => l.name && l.quantity > 0 && l.line_total >= 0));
     assert.ok(statement.rows.some((r) => r.kind === 'payment'));
   });
 
@@ -744,5 +747,30 @@ describe('container deliveries', () => {
   it('rejects a missing container number', async () => {
     const res = await api.post('/containers', { delivery_date: today(), container_no: ' ', party_name: 'Zia', weight_kg: 10, bales: 1 });
     assert.equal(res.status, 400);
+  });
+});
+
+describe('supplier statement lists each fabric separately', () => {
+  it('returns every purchase line as its own item with yards, rate and amount', async () => {
+    const supplier = (await api.post('/suppliers', { name: 'Statement Test Supplier', currency: 'PKR' })).data;
+    const category = (await api.get('/catalog')).data[0];
+    const set = (await api.post('/products/set', { set_name: 'ST-1', code: 'ST1', category_id: category.id })).data;
+    const front = set.find((p) => p.part === 'front');
+    const back = set.find((p) => p.part === 'back');
+    const res = await api.post('/purchases', {
+      purchase_date: today(), supplier_id: supplier.id, paid_amount: 100,
+      lines: [
+        { product_id: front.id, pieces: [10, 6], rate: 50, rate_unit: 'yard' },
+        { product_id: back.id, pieces: [8], rate: 30, rate_unit: 'yard' },
+      ],
+    });
+    assert.equal(res.status, 201);
+    const statement = (await api.get(`/suppliers/${supplier.id}/statement`)).data;
+    const purchase = statement.rows.find((r) => r.kind === 'purchase');
+    assert.equal(purchase.lines.length, 2);
+    assert.deepEqual(purchase.lines.map((l) => l.quantity), [16, 8]);
+    assert.deepEqual(purchase.lines.map((l) => l.line_total), [800, 240]);
+    assert.equal(purchase.lines[0].part, 'front');
+    assert.ok(statement.rows.some((r) => r.kind === 'payment' && r.credit === 100));
   });
 });
