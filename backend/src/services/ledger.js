@@ -66,9 +66,10 @@ export async function getSupplier(db = pool, id) {
 async function linesFor(db, table, parentColumn, ids) {
   const map = new Map();
   if (!ids.length) return map;
+  const isPurchase = table === 'purchase_lines';
   const [rows] = await db.query(
-    `SELECT l.${parentColumn} AS parent_id, l.quantity, l.rate, l.rate_unit, l.line_total, p.name, p.set_name, p.part
-     FROM ${table} l JOIN products p ON p.id = l.product_id
+    `SELECT l.${parentColumn} AS parent_id, l.quantity, l.rate, l.rate_unit, l.line_total, p.name, p.set_name, p.part${isPurchase ? ', d.name AS design_name' : ''}
+     FROM ${table} l JOIN products p ON p.id = l.product_id${isPurchase ? ' LEFT JOIN designs d ON d.id = l.design_id' : ''}
      WHERE l.${parentColumn} IN (?) ORDER BY l.id`,
     [ids]
   );
@@ -81,7 +82,7 @@ async function linesFor(db, table, parentColumn, ids) {
 }
 
 const describeLines = (lines) =>
-  lines.map((l) => `${l.name} ${l.quantity} yd @ ${l.rate}/${l.rate_unit}`).join('; ');
+  lines.map((l) => `${l.name}${l.design_name ? ` (${l.design_name})` : ''} ${l.quantity} yd @ ${l.rate}/${l.rate_unit}`).join('; ');
 
 function sortAndRun(entries, opening) {
   entries.sort((a, b) => a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at) || a.id - b.id);

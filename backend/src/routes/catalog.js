@@ -15,6 +15,17 @@ async function loadCatalog() {
 
 router.get('/', asyncHandler(async (req, res) => res.json(await loadCatalog())));
 
+router.get('/designs', asyncHandler(async (req, res) => {
+  const [rows] = await pool.query('SELECT id, name FROM designs ORDER BY name');
+  res.json(rows);
+}));
+
+router.post('/designs', validate(nameSchema), asyncHandler(async (req, res) => {
+  await pool.query('INSERT INTO designs (name) VALUES (?)', [req.body.name]);
+  const [rows] = await pool.query('SELECT id, name FROM designs ORDER BY name');
+  res.status(201).json(rows);
+}));
+
 router.post('/categories', validate(nameSchema), asyncHandler(async (req, res) => {
   await pool.query('INSERT INTO categories (name) VALUES (?)', [req.body.name]);
   res.status(201).json(await loadCatalog());

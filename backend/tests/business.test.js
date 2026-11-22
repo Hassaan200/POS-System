@@ -774,3 +774,28 @@ describe('supplier statement lists each fabric separately', () => {
     assert.ok(statement.rows.some((r) => r.kind === 'payment' && r.credit === 100));
   });
 });
+
+describe('design on purchase lines', () => {
+  it('lets one set code be bought in different designs and shows the design in the statement', async () => {
+    const supplier = (await api.post('/suppliers', { name: 'Design Test Supplier', currency: 'PKR' })).data;
+    const category = (await api.get('/catalog')).data[0];
+    const set = (await api.post('/products/set', { set_name: 'DS-1', code: 'DS1', category_id: category.id })).data;
+    const front = set.find((p) => p.part === 'front');
+    const designs = (await api.get('/catalog/designs')).data;
+    assert.ok(designs.length >= 6);
+    const [first, second] = designs;
+    for (const [design, yards] of [[first, 10], [second, 5]]) {
+      const res = await api.post('/purchases', {
+        purchase_date: today(), supplier_id: supplier.id,
+        lines: [{ product_id: front.id, design_id: design.id, quantity: yards, rate: 20, rate_unit: 'yard' }],
+      });
+      assert.equal(res.status, 201);
+    }
+    const statement = (await api.get(`/suppliers/${supplier.id}/statement`)).data;
+    const names = statement.rows.filter((r) => r.kind === 'purchase').flatMap((r) => r.lines.map((l) => l.design_name));
+    assert.deepEqual(names.sort(), [first.name, second.name].sort());
+    const added = await api.post('/catalog/designs', { name: 'Test design xyz' });
+    assert.equal(added.status, 201);
+    assert.ok(added.data.some((d) => d.name === 'Test design xyz'));
+  });
+});

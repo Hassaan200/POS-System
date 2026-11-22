@@ -148,7 +148,7 @@ function ItemsTable({ lines, code, showMeters }) {
         <tbody>
           {lines.map((l, i) => (
             <tr key={i} className="border-t border-slate-100">
-              <td className="px-1.5 py-1.5 sm:px-2">{l.name}</td>
+              <td className="px-1.5 py-1.5 sm:px-2">{l.name}{l.design_name && <div className="text-xs text-slate-500">{l.design_name}</div>}</td>
               <td className="px-2 py-1.5 text-right">{qty(l.quantity)}</td>
               {showMeters && <td className="px-2 py-1.5 text-right">{toMeters(l.quantity).toFixed(2)}</td>}
               <td className="px-1.5 py-1.5 text-right sm:px-2 sm:whitespace-nowrap">{cur(l.rate, code)}/{l.rate_unit === 'meter' ? 'm' : 'yd'}</td>
@@ -172,6 +172,21 @@ function Statement({ cfg, party, onClose }) {
     api.get(`${cfg.base}/${party.id}/statement`).then(setData).catch((err) => setError(err.message));
   }, [cfg.base, party.id]);
 
+  const designSummary = useMemo(() => {
+    if (!data || !isSupplier) return [];
+    const map = new Map();
+    for (const r of data.rows) {
+      for (const l of r.lines ?? []) {
+        if (!l.design_name) continue;
+        const e = map.get(l.design_name) ?? { design: l.design_name, yards: 0, amount: 0 };
+        e.yards += Number(l.quantity);
+        e.amount += Number(l.line_total);
+        map.set(l.design_name, e);
+      }
+    }
+    return [...map.values()];
+  }, [data, isSupplier]);
+
   const totalDebit = data ? data.rows.reduce((sum, r) => sum + r.debit, 0) : 0;
   const totalCredit = data ? data.rows.reduce((sum, r) => sum + r.credit, 0) : 0;
 
@@ -186,6 +201,22 @@ function Statement({ cfg, party, onClose }) {
             <div className="bg-slate-50 px-3 py-2"><div className="text-xs text-slate-500">{cfg.paidLabel}</div><div className="font-semibold">{fmt(totalCredit)}</div></div>
             <div className="bg-slate-50 px-3 py-2"><div className="text-xs text-slate-500">{cfg.balanceLabel}</div><div className="font-semibold">{fmt(data.customer?.balance ?? data.supplier?.balance)}</div></div>
           </div>
+          {designSummary.length > 0 && (
+            <div className="border border-slate-300">
+              <div className="bg-slate-50 px-3 py-1.5 text-xs uppercase tracking-wide text-slate-500">Design-wise purchases</div>
+              <table className="w-full text-sm">
+                <tbody>
+                  {designSummary.map((d) => (
+                    <tr key={d.design} className="border-t border-slate-100">
+                      <td className="px-3 py-1.5">{d.design}</td>
+                      <td className="px-3 py-1.5 text-right">{qty(d.yards)} yd</td>
+                      <td className="px-3 py-1.5 text-right font-medium">{fmt(d.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {data.opening_balance !== 0 && (
             <div className="flex justify-between border border-slate-200 px-3 py-2 text-sm text-slate-600">
               <span>Opening balance</span><span>{fmt(data.opening_balance)}</span>

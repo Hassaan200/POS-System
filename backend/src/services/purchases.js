@@ -15,8 +15,8 @@ export async function getPurchase(db, id) {
   );
   if (!purchase) throw notFound('Purchase not found');
   const [lines] = await db.query(
-    `SELECT pl.*, pr.name AS product_name, pr.code AS product_code, pr.set_name, pr.part
-     FROM purchase_lines pl JOIN products pr ON pr.id = pl.product_id WHERE pl.purchase_id = ? ORDER BY pl.id`,
+    `SELECT pl.*, pr.name AS product_name, pr.code AS product_code, pr.set_name, pr.part, d.name AS design_name
+     FROM purchase_lines pl JOIN products pr ON pr.id = pl.product_id LEFT JOIN designs d ON d.id = pl.design_id WHERE pl.purchase_id = ? ORDER BY pl.id`,
     [id]
   );
   const [pieces] = await db.query(
@@ -101,8 +101,8 @@ export async function createPurchase(input, userId) {
 
       for (const line of lines) {
         const [lineResult] = await conn.query(
-          'INSERT INTO purchase_lines (purchase_id, product_id, quantity, rate, rate_unit, line_total, cost_pkr) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [purchaseId, line.product_id, line.quantity, line.rate, line.rate_unit, line.line_total, line.cost_pkr]
+          'INSERT INTO purchase_lines (purchase_id, product_id, design_id, quantity, rate, rate_unit, line_total, cost_pkr) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [purchaseId, line.product_id, line.design_id ?? null, line.quantity, line.rate, line.rate_unit, line.line_total, line.cost_pkr]
         );
         for (const [seq, length] of (line.pieces ?? []).entries()) {
           await conn.query(

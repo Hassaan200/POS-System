@@ -35,6 +35,7 @@ const lineSchema = z.object({ product_id: idSchema, quantity: qtySchema, rate: r
 const purchaseLineSchema = z
   .object({
     product_id: idSchema,
+    design_id: idSchema.nullable().optional(),
     quantity: qtySchema.optional(),
     pieces: z.array(qtySchema).min(1).max(200).optional(),
     rate: rateSchema,

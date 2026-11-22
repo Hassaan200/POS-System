@@ -6,8 +6,8 @@ import { Button, ErrorBox, Field, Modal, PageHeader, inputClass } from '../compo
 import Amount from '../components/Amount.jsx';
 import { PARTS, ThaanGrid, emptyRow, setTotals } from '../components/ThaanGrid.jsx';
 
-const emptySet = () => ({ kind: 'set', set_name: '', rows: [emptyRow()], rates: { front: '', back: '', dupatta: '' }, unit: 'meter' });
-const emptyPlain = () => ({ kind: 'plain', product_id: '', rows: [{ v: '' }], rate: '', unit: 'meter' });
+const emptySet = () => ({ kind: 'set', set_name: '', design_id: '', rows: [emptyRow()], rates: { front: '', back: '', dupatta: '' }, unit: 'meter' });
+const emptyPlain = () => ({ kind: 'plain', product_id: '', design_id: '', rows: [{ v: '' }], rate: '', unit: 'meter' });
 
 const UnitRate = ({ block, onChange, code }) => (
   <div className="grid grid-cols-2 gap-2">
@@ -48,17 +48,57 @@ const blockAmount = (b) => (b.kind === 'set'
   ? setTotals(b).amount
   : lineAmount(b.rows.reduce((s, r) => s + Number(r.v || 0), 0), b.rate, b.unit));
 
+function DesignPicker({ designs, value, onChange, onAdded }) {
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState('');
+  const [err, setErr] = useState('');
+
+  async function add() {
+    if (!name.trim()) return;
+    try {
+      const list = await api.post('/catalog/designs', { name: name.trim() });
+      onAdded(list);
+      onChange(String(list.find((d) => d.name === name.trim())?.id ?? ''));
+      setName('');
+      setAdding(false);
+      setErr('');
+    } catch (e) { setErr(e.message); }
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <select className={`${inputClass} sm:w-72`} value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">Design / quality (optional)</option>
+          {designs.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+        </select>
+        <button type="button" className="whitespace-nowrap text-sm underline" onClick={() => setAdding((a) => !a)}>{adding ? 'Cancel' : '+ New'}</button>
+      </div>
+      {adding && (
+        <div className="flex gap-2">
+          <input className={`${inputClass} sm:w-72`} placeholder="e.g. Phool wala" value={name} onChange={(e) => setName(e.target.value)} />
+          <Button variant="secondary" onClick={add}>Add</Button>
+        </div>
+      )}
+      {err && <div className="text-xs text-red-600">{err}</div>}
+    </div>
+  );
+}
+
 function PurchaseForm({ products, suppliers, onClose, onSaved }) {
   const key = useRef(newKey());
   const defaultRate = useRate();
   const [date, setDate] = useState(today());
   const [supplierId, setSupplierId] = useState('');
   const [blocks, setBlocks] = useState([emptySet()]);
+  const [designs, setDesigns] = useState([]);
   const [rateInput, setRateInput] = useState('');
   const [paid, setPaid] = useState('0');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => { api.get('/catalog/designs').then(setDesigns).catch(() => {}); }, []);
 
   const supplier = suppliers.find((s) => String(s.id) === supplierId);
   const code = supplier?.currency || 'PKR';
@@ -81,12 +121,12 @@ function PurchaseForm({ products, suppliers, onClose, onSaved }) {
           if (!product) throw new Error(`${b.set_name} has no ${part} product`);
           const partRate = Number(b.rates[part]);
           if (!(partRate > 0)) throw new Error(`Enter the ${part} rate for ${b.set_name}`);
-          lines.push({ product_id: product.id, pieces, rate: partRate, rate_unit: b.unit });
+          lines.push({ product_id: product.id, design_id: b.design_id ? Number(b.design_id) : null, pieces, rate: partRate, rate_unit: b.unit });
         }
       } else {
         if (!b.product_id) throw new Error('Select a fabric for every plain block');
         const pieces = b.rows.map((r) => Number(r.v)).filter((n) => n > 0);
-        if (pieces.length) lines.push({ product_id: Number(b.product_id), pieces, rate: Number(b.rate), rate_unit: b.unit });
+        if (pieces.length) lines.push({ product_id: Number(b.product_id), design_id: b.design_id ? Number(b.design_id) : null, pieces, rate: Number(b.rate), rate_unit: b.unit });
       }
     }
     if (!lines.length) throw new Error('Enter at least one thaan length');
@@ -149,6 +189,7 @@ function PurchaseForm({ products, suppliers, onClose, onSaved }) {
               <div className="text-sm font-semibold">{cur(blockAmount(b), code)}</div>
               {blocks.length > 1 && <button type="button" className="text-red-600" onClick={() => setBlocks(blocks.filter((_, idx) => idx !== i))}>Remove</button>}
             </div>
+            <DesignPicker designs={designs} value={b.design_id} onChange={(v) => update(i)({ ...b, design_id: v })} onAdded={setDesigns} />
             {b.kind === 'set'
               ? <ThaanGrid block={b} onChange={update(i)} />
               : <PlainBlock block={b} products={products} onChange={update(i)} code={code} />}
@@ -218,8 +259,8 @@ function BillView({ id, onClose, onChanged }) {
     if (!p) return [];
     const map = new Map();
     for (const l of p.lines) {
-      const k = l.set_name || `plain-${l.id}`;
-      if (!map.has(k)) map.set(k, { name: l.set_name || l.product_name, set: Boolean(l.set_name), lines: [] });
+      const k = `${l.set_name || `plain-${l.id}`}|${l.design_id ?? ''}`;
+      if (!map.has(k)) map.set(k, { key: k, name: l.set_name || l.product_name, design: l.design_name, set: Boolean(l.set_name), lines: [] });
       map.get(k).lines.push(l);
     }
     return [...map.values()];
@@ -240,8 +281,8 @@ function BillView({ id, onClose, onChanged }) {
             const cols = g.set ? PARTS.filter((c) => byPart[c.part]) : [{ part: 'plain', label: 'Yards' }];
             const rows = Math.max(...cols.map((c) => byPart[c.part].pieces.length), 0);
             return (
-              <div key={g.name} className="overflow-x-auto border border-slate-300 p-2">
-                <div className="mb-1 font-medium">{g.name}</div>
+              <div key={g.key} className="overflow-x-auto border border-slate-300 p-2">
+                <div className="mb-1 font-medium">{g.name}{g.design && <span className="ml-2 bg-slate-100 px-2 py-0.5 text-xs font-normal">{g.design}</span>}</div>
                 <table className="w-full text-sm">
                   <thead className="text-left text-xs uppercase text-slate-500">
                     <tr><th className="px-1 py-1">#</th>{cols.map((c) => <th key={c.part} className="px-1 py-1">{c.label} (yd)</th>)}</tr>
