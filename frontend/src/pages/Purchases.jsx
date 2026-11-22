@@ -4,10 +4,11 @@ import { cur, lineAmount, qty, today, toMeters } from '../lib/format.js';
 import useRate from '../lib/useRate.js';
 import { Button, ErrorBox, Field, Modal, PageHeader, inputClass } from '../components/ui.jsx';
 import Amount from '../components/Amount.jsx';
+import { AddPhotoButton, MAX_PHOTOS, PhotoPicker, PhotoStrip } from '../components/Photos.jsx';
 import { PARTS, ThaanGrid, emptyRow, setTotals } from '../components/ThaanGrid.jsx';
 
-const emptySet = () => ({ kind: 'set', set_name: '', design_id: '', rows: [emptyRow()], rates: { front: '', back: '', dupatta: '' }, unit: 'meter' });
-const emptyPlain = () => ({ kind: 'plain', product_id: '', design_id: '', rows: [{ v: '' }], rate: '', unit: 'meter' });
+const emptySet = () => ({ kind: 'set', set_name: '', design_id: '', photos: [], rows: [emptyRow()], rates: { front: '', back: '', dupatta: '' }, unit: 'meter' });
+const emptyPlain = () => ({ kind: 'plain', product_id: '', design_id: '', photos: [], rows: [{ v: '' }], rate: '', unit: 'meter' });
 
 const UnitRate = ({ block, onChange, code }) => (
   <div className="grid grid-cols-2 gap-2">
@@ -111,7 +112,9 @@ function PurchaseForm({ products, suppliers, onClose, onSaved }) {
 
   function buildLines() {
     const lines = [];
+    const anchors = [];
     for (const b of blocks) {
+      anchors.push(lines.length);
       if (b.kind === 'set') {
         if (!b.set_name) throw new Error('Select a set for every set block');
         for (const { part } of PARTS) {
@@ -130,20 +133,32 @@ function PurchaseForm({ products, suppliers, onClose, onSaved }) {
       }
     }
     if (!lines.length) throw new Error('Enter at least one thaan length');
-    return lines;
+    return { lines, anchors };
   }
 
   async function submit(e) {
     e.preventDefault();
     setError('');
     let lines;
-    try { lines = buildLines(); } catch (err) { setError(err.message); return; }
+    let anchors;
+    try { ({ lines, anchors } = buildLines()); } catch (err) { setError(err.message); return; }
     if (isCny && !(rate > 0)) { setError('Enter the Yuan rate (PKR for 1 ¥)'); return; }
     setBusy(true);
     try {
       const body = { purchase_date: date, supplier_id: Number(supplierId), lines, paid_amount: Number(paid || 0), notes: notes || null };
       if (isCny) body.exchange_rate = rate;
-      await api.post('/purchases', body, key.current);
+      const saved = await api.post('/purchases', body, key.current);
+      let failed = 0;
+      if (!saved.duplicate) {
+        for (const [i, b] of blocks.entries()) {
+          const line = saved.lines[anchors[i]];
+          if (!line) continue;
+          for (const photo of b.photos) {
+            try { await api.upload(`/purchases/lines/${line.id}/images`, photo.blob); } catch { failed += 1; }
+          }
+        }
+      }
+      if (failed) window.alert(`Purchase saved, but ${failed} photo(s) could not be uploaded. Open the bill and add them again.`);
       onSaved();
     } catch (err) {
       setError(err.message);
@@ -190,6 +205,7 @@ function PurchaseForm({ products, suppliers, onClose, onSaved }) {
               {blocks.length > 1 && <button type="button" className="text-red-600" onClick={() => setBlocks(blocks.filter((_, idx) => idx !== i))}>Remove</button>}
             </div>
             <DesignPicker designs={designs} value={b.design_id} onChange={(v) => update(i)({ ...b, design_id: v })} onAdded={setDesigns} />
+            <PhotoPicker photos={b.photos} onChange={(photos) => update(i)({ ...b, photos })} label="Photo (colour / thaan)" />
             {b.kind === 'set'
               ? <ThaanGrid block={b} onChange={update(i)} />
               : <PlainBlock block={b} products={products} onChange={update(i)} code={code} />}
@@ -250,6 +266,11 @@ function BillView({ id, onClose, onChanged }) {
   const load = useCallback(() => api.get(`/purchases/${id}`).then(setP).catch((e) => setError(e.message)), [id]);
   useEffect(() => { load(); }, [load]);
 
+  async function removePhoto(imageId) {
+    if (!window.confirm('Remove this photo?')) return;
+    try { await api.delete(`/purchases/images/${imageId}`); await load(); } catch (e) { setError(e.message); }
+  }
+
   async function voidCost(c) {
     if (!window.confirm('Void this cost? Stock value will go back down.')) return;
     try { await api.post(`/purchases/costs/${c.id}/void`); await load(); onChanged(); } catch (e) { setError(e.message); }
@@ -283,6 +304,10 @@ function BillView({ id, onClose, onChanged }) {
             return (
               <div key={g.key} className="overflow-x-auto border border-slate-300 p-2">
                 <div className="mb-1 font-medium">{g.name}{g.design && <span className="ml-2 bg-slate-100 px-2 py-0.5 text-xs font-normal">{g.design}</span>}</div>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <PhotoStrip ids={g.lines.flatMap((l) => l.images)} size={64} onRemove={removePhoto} />
+                  {g.lines[0].images.length < MAX_PHOTOS && <AddPhotoButton lineId={g.lines[0].id} onDone={load} onError={setError} />}
+                </div>
                 <table className="w-full text-sm">
                   <thead className="text-left text-xs uppercase text-slate-500">
                     <tr><th className="px-1 py-1">#</th>{cols.map((c) => <th key={c.part} className="px-1 py-1">{c.label} (yd)</th>)}</tr>

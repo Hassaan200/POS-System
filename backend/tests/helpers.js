@@ -60,6 +60,11 @@ export function createClient(base) {
     get: (path) => request('GET', path),
     post: (path, body, opts) => request('POST', path, body ?? {}, opts),
     put: (path, body) => request('PUT', path, body),
+    raw: (method, path, body, contentType) => fetch(`${base}${path}`, {
+      method,
+      headers: { ...(contentType ? { 'content-type': contentType } : {}), ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body,
+    }),
     setToken: (t) => { token = t; },
     async login(email = EMAIL, password = PASSWORD) {
       const res = await request('POST', '/auth/login', { email, password }, { key: false });

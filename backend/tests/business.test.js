@@ -799,3 +799,37 @@ describe('design on purchase lines', () => {
     assert.ok(added.data.some((d) => d.name === 'Test design xyz'));
   });
 });
+
+describe('purchase photos', () => {
+  const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200, 1)]);
+  const upload = (lineId, body, type = 'image/jpeg') => api.raw('POST', `/purchases/lines/${lineId}/images`, body, type);
+
+  it('stores up to three photos per line, serves them back and rejects bad files', async () => {
+    const supplier = (await api.post('/suppliers', { name: 'Photo Supplier', currency: 'PKR' })).data;
+    const category = (await api.get('/catalog')).data[0];
+    const set = (await api.post('/products/set', { set_name: 'PH-1', code: 'PH1', category_id: category.id })).data;
+    const front = set.find((p) => p.part === 'front');
+    const purchase = (await api.post('/purchases', {
+      purchase_date: today(), supplier_id: supplier.id,
+      lines: [{ product_id: front.id, quantity: 10, rate: 5, rate_unit: 'yard' }],
+    })).data;
+    const lineId = purchase.lines[0].id;
+
+    const fake = await upload(lineId, Buffer.from('not an image at all'));
+    assert.equal(fake.status, 400);
+
+    for (let i = 0; i < 3; i += 1) assert.equal((await upload(lineId, jpeg)).status, 201);
+    assert.equal((await upload(lineId, jpeg)).status, 400);
+
+    const fresh = (await api.get(`/purchases/${purchase.id}`)).data;
+    assert.equal(fresh.lines[0].images.length, 3);
+
+    const served = await api.raw('GET', `/purchases/images/${fresh.lines[0].images[0]}`);
+    assert.equal(served.status, 200);
+    assert.equal(served.headers.get('content-type'), 'image/jpeg');
+    assert.equal(Buffer.from(await served.arrayBuffer()).length, jpeg.length);
+
+    const statement = (await api.get(`/suppliers/${supplier.id}/statement`)).data;
+    assert.equal(statement.rows.find((r) => r.kind === 'purchase').lines[0].images.length, 3);
+  });
+});

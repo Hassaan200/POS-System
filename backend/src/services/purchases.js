@@ -2,6 +2,7 @@ import { pool, withTransaction } from '../config/db.js';
 import { r2 } from '../utils/money.js';
 import { lineAmount } from '../utils/units.js';
 import { badRequest, conflict, notFound } from '../utils/errors.js';
+import { imageIdsFor } from './images.js';
 import {
   audit, findByKey, getSettings, insufficient, isDuplicateKeyError, lockParty, lockProducts, nextRef,
 } from './common.js';
@@ -24,8 +25,10 @@ export async function getPurchase(db, id) {
      JOIN purchase_lines pl ON pl.id = pp.purchase_line_id WHERE pl.purchase_id = ? ORDER BY pp.purchase_line_id, pp.seq`,
     [id]
   );
+  const images = await imageIdsFor(db, lines.map((l) => l.id));
   const withPieces = lines.map((line) => ({
     ...line,
+    images: images.get(line.id) ?? [],
     pieces: pieces.filter((p) => p.purchase_line_id === line.id).map((p) => p.length),
   }));
   const [extraCosts] = await db.query(

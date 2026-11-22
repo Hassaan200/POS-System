@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { z } from 'zod';
 import { pool } from '../config/db.js';
 import {
@@ -9,6 +9,7 @@ import { badRequest } from '../utils/errors.js';
 import {
   addPurchaseCost, cancelPurchase, createPurchase, getPurchase, listPurchases, voidPurchaseCost,
 } from '../services/purchases.js';
+import { addLineImage, deleteImage, getImage } from '../services/images.js';
 import { cancelSale, createSale, getSale, listSales } from '../services/sales.js';
 import {
   createCustomerPayment, createSupplierPayment, listCustomerPayments, listSupplierPayments, voidPayment,
@@ -92,6 +93,17 @@ const supplierPaymentSchema = z.object({
 
 export const purchasesRouter = Router();
 purchasesRouter.get('/', asyncHandler(async (req, res) => res.json(await listPurchases(listQuery.parse(req.query)))));
+purchasesRouter.post('/lines/:lineId/images', express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '500kb' }), asyncHandler(async (req, res) => {
+  res.status(201).json(await addLineImage(idSchema.parse(req.params.lineId), req.body, req.user.id));
+}));
+purchasesRouter.get('/images/:imageId', asyncHandler(async (req, res) => {
+  const image = await getImage(idSchema.parse(req.params.imageId));
+  res.set('Content-Type', image.mime).set('Cache-Control', 'private, max-age=86400').send(image.data);
+}));
+purchasesRouter.delete('/images/:imageId', asyncHandler(async (req, res) => {
+  await deleteImage(idSchema.parse(req.params.imageId), req.user.id);
+  res.json({ ok: true });
+}));
 purchasesRouter.get('/:id', asyncHandler(async (req, res) => res.json(await getPurchase(pool, idSchema.parse(req.params.id)))));
 purchasesRouter.post('/', withKey, validate(purchaseSchema), asyncHandler(async (req, res) => {
   const { purchase, duplicate } = await createPurchase(req.body, req.user.id);

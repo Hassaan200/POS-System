@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, newKey } from '../lib/api.js';
+import { PhotoStrip } from '../components/Photos.jsx';
 import { cur, qty, toMeters, today } from '../lib/format.js';
 import useRate from '../lib/useRate.js';
 import Amount from '../components/Amount.jsx';
@@ -241,6 +242,9 @@ function Statement({ cfg, party, onClose }) {
                   </div>
                 </div>
                 {isPayment && r.description && <div className="px-3 pb-2 text-xs text-slate-500">{r.description}</div>}
+                {!isPayment && r.lines?.some((l) => l.images?.length) && (
+                  <div className="px-3 py-2"><PhotoStrip ids={r.lines.flatMap((l) => l.images ?? [])} size={56} /></div>
+                )}
                 {!isPayment && r.lines?.length > 0 && <ItemsTable lines={r.lines} code={code} showMeters={isSupplier} />}
               </div>
             );

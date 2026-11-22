@@ -1,6 +1,7 @@
 import { pool } from '../config/db.js';
 import { r2 } from '../utils/money.js';
 import { notFound } from '../utils/errors.js';
+import { imageIdsFor } from './images.js';
 
 const customerSelect = `
   SELECT c.id, c.name, c.mobile, c.opening_balance, c.is_active, c.created_at,
@@ -68,13 +69,15 @@ async function linesFor(db, table, parentColumn, ids) {
   if (!ids.length) return map;
   const isPurchase = table === 'purchase_lines';
   const [rows] = await db.query(
-    `SELECT l.${parentColumn} AS parent_id, l.quantity, l.rate, l.rate_unit, l.line_total, p.name, p.set_name, p.part${isPurchase ? ', d.name AS design_name' : ''}
+    `SELECT l.id AS line_id, l.${parentColumn} AS parent_id, l.quantity, l.rate, l.rate_unit, l.line_total, p.name, p.set_name, p.part${isPurchase ? ', d.name AS design_name' : ''}
      FROM ${table} l JOIN products p ON p.id = l.product_id${isPurchase ? ' LEFT JOIN designs d ON d.id = l.design_id' : ''}
      WHERE l.${parentColumn} IN (?) ORDER BY l.id`,
     [ids]
   );
+  const images = isPurchase ? await imageIdsFor(db, rows.map((r) => r.line_id)) : new Map();
   for (const row of rows) {
-    const { parent_id: parentId, ...line } = row;
+    const { parent_id: parentId, line_id: lineId, ...line } = row;
+    if (isPurchase) line.images = images.get(lineId) ?? [];
     if (!map.has(parentId)) map.set(parentId, []);
     map.get(parentId).push(line);
   }

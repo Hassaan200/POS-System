@@ -49,6 +49,31 @@ export const api = {
   get: (path) => request('GET', path),
   post: (path, body = {}, key) => request('POST', path, { body, key }),
   put: (path, body) => request('PUT', path, { body }),
+  delete: (path) => request('DELETE', path),
+  async blob(path) {
+    const token = getToken();
+    const response = await fetch(`${BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+    if (!response.ok) throw new ApiError('Photo could not be loaded', response.status);
+    return response.blob();
+  },
+  async upload(path, blob) {
+    const token = getToken();
+    let response;
+    try {
+      response = await fetch(`${BASE}${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': blob.type, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: blob,
+      });
+    } catch {
+      throw new ApiError('Cannot reach the server. Check your internet connection', 0);
+    }
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      throw new ApiError(data.error || 'Upload failed', response.status);
+    }
+    return response.json();
+  },
   async download(path, fallbackName) {
     const token = getToken();
     const response = await fetch(`${BASE}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
